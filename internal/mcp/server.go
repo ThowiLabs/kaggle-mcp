@@ -122,7 +122,15 @@ func (s *Server) Handler() http.Handler {
 	panel := dashboard.New(s.public, s.pinState, s.auth.ResetOwner, s.projects, s.skills, s.configureGitHub, s.githubConfigured, s.projectExport, s.projectImport)
 	panel.HuggingFace = s.configureHF
 	panel.HFConfigured = s.hfConfigured
-	mux.Handle("/", panel)
+	if err := panel.EnablePersistence(filepath.Join(s.cfg.DataDir, "state", "web-sessions.json")); err != nil {
+		slog.Error("no se pudo cargar las sesiones persistentes", "error", err)
+		// Un estado inválido no permite un fallback silencioso a sesiones efímeras.
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "No se pudo iniciar sesión segura. Revisa permisos del directorio state.", 503)
+		})
+	} else {
+		mux.Handle("/", panel)
+	}
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = io.WriteString(w, "KagMCP OK\n")

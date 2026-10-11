@@ -38,7 +38,7 @@ func TestPanelAxolotlYMetricasAutorizadas(t *testing.T) {
 		t.Fatal("sesión no establecida")
 	}
 	home := call(h, "GET", "/", nil, session)
-	if home.Code != 200 || !strings.Contains(home.Body.String(), "HF_TOKEN") || !strings.Contains(home.Body.String(), "gpuRing") {
+	if home.Code != 200 || !strings.Contains(home.Body.String(), "cpuGaugeArc") || !strings.Contains(home.Body.String(), "gpuRing") {
 		t.Fatalf("panel Axolotl incompleto: HTTP %d", home.Code)
 	}
 	response := call(h, "GET", "/api/metrics", nil, session)

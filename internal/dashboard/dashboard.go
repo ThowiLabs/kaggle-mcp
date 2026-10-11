@@ -14,6 +14,7 @@ import (
 	"github.com/ThowiLabs/kagssh-go/internal/gpumetrics"
 	"github.com/ThowiLabs/kagssh-go/internal/pinauth"
 	"github.com/ThowiLabs/kagssh-go/internal/projectstate"
+	"github.com/ThowiLabs/kagssh-go/internal/runtimemetrics"
 	"github.com/ThowiLabs/kagssh-go/internal/skills"
 	"html/template"
 	"log/slog"
@@ -49,11 +50,13 @@ type Handler struct {
 	sessions         map[string]session
 	failures         map[string]attempts
 	global           attempts
+	sessionFile      string
+	monitor          *runtimemetrics.Monitor
 }
 
 func New(public string, pin *pinauth.State, revokePIN func() error, store *projectstate.Store, reg skills.Registry, github func(context.Context, string) (string, error), configured func() bool, export func(string) (any, error), importProject func(string) (any, error)) *Handler {
 	return &Handler{Public: public, pin: pin, revokePIN: revokePIN, Projects: store, Skills: reg, GitHub: github, GitHubConfigured: configured, Export: export, Import: importProject,
-		sessions: map[string]session{}, failures: map[string]attempts{}}
+		sessions: map[string]session{}, failures: map[string]attempts{}, monitor: runtimemetrics.New()}
 }
 func random() string {
 	b := make([]byte, 32)
@@ -132,6 +135,10 @@ func (h *Handler) loginPage(w http.ResponseWriter, status int, message string) {
 }
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
+		if _, ok := h.authorize(r); ok {
+			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+			return
+		}
 		h.loginPage(w, http.StatusOK, "")
 		return
 	}
@@ -179,10 +186,16 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "demasiadas sesiones", 429)
 		return
 	}
-	h.sessions[key(token)] = session{CSRF: csrf, Expires: time.Now().Add(8 * time.Hour)}
+	h.sessions[key(token)] = session{CSRF: csrf, Expires: time.Now().Add(sessionTTL)}
+	if err := h.saveSessionsLocked(); err != nil {
+		delete(h.sessions, key(token))
+		h.mu.Unlock()
+		http.Error(w, "No se pudo guardar la sesión segura", http.StatusInternalServerError)
+		return
+	}
 	delete(h.failures, ip(r))
 	h.mu.Unlock()
-	cookie(w, "__Host-kagmcp-session", token, 8*3600)
+	cookie(w, "__Host-kagmcp-session", token, int(sessionTTL.Seconds()))
 	cookie(w, "__Host-kagmcp-login", "", -1)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -222,6 +235,24 @@ func (h *Handler) Verify(w http.ResponseWriter, r *http.Request) (session, bool)
 	return s, true
 }
 
+var pageDescriptions = map[string][2]string{
+	"/dashboard":    {"Dashboard", "Estado de CPU, memoria, GPU y disco de Kaggle"},
+	"/resources":    {"Recursos Kaggle", "Telemetría detallada del runtime, sin valores de demostración"},
+	"/projects":     {"Proyectos", "Administra proyectos, tareas y memoria compartida"},
+	"/activity":     {"Actividad", "Registro de comandos ejecutados por los agentes"},
+	"/integrations": {"Integraciones", "Tokens de GitHub y Hugging Face"},
+	"/skills":       {"Skills", "Habilidades y documentación de los agentes"},
+	"/security":     {"Seguridad", "Gestiona tu PIN y la sesión de administración"},
+}
+
+func isPage(path string) bool {
+	if path == "/" {
+		return true
+	}
+	_, ok := pageDescriptions[path]
+	return ok
+}
+
 type view struct {
 	Login        bool
 	CSRF         string
@@ -233,6 +264,9 @@ type view struct {
 	SkillName    string
 	NextOffset   int
 	GitHubOn     bool
+	Page         string
+	PageTitle    string
+	PageSubtitle string
 	HFOn         bool
 }
 
@@ -246,7 +280,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.login(w, r)
 		return
 	}
-	if r.URL.Path != "/" && r.URL.Path != "/skills" && r.URL.Path != "/project" && r.URL.Path != "/memory" && r.URL.Path != "/task" && r.URL.Path != "/task-status" && r.URL.Path != "/github" && r.URL.Path != "/huggingface" && r.URL.Path != "/api/metrics" && r.URL.Path != "/export" && r.URL.Path != "/import" && r.URL.Path != "/change-pin" && r.URL.Path != "/logout" {
+	if r.URL.Path != "/" && r.URL.Path != "/dashboard" && r.URL.Path != "/resources" && r.URL.Path != "/projects" && r.URL.Path != "/activity" && r.URL.Path != "/integrations" && r.URL.Path != "/security" && r.URL.Path != "/skills" && r.URL.Path != "/project" && r.URL.Path != "/memory" && r.URL.Path != "/task" && r.URL.Path != "/task-status" && r.URL.Path != "/github" && r.URL.Path != "/huggingface" && r.URL.Path != "/api/metrics" && r.URL.Path != "/export" && r.URL.Path != "/import" && r.URL.Path != "/change-pin" && r.URL.Path != "/logout" {
 		http.NotFound(w, r)
 		return
 	}
@@ -263,12 +297,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodGet {
-		if r.URL.Path != "/" && r.URL.Path != "/skills" {
+		if !isPage(r.URL.Path) {
 			http.NotFound(w, r)
 			return
 		}
 		state := h.Projects.Snapshot()
-		v := view{CSRF: sess.CSRF, Projects: state.Projects, History: state.History, GitHubOn: h.GitHubConfigured(), HFOn: h.HFConfigured != nil && h.HFConfigured()}
+		pageName := r.URL.Path
+		if pageName == "/" {
+			pageName = "/dashboard"
+		}
+		meta := pageDescriptions[pageName]
+		v := view{CSRF: sess.CSRF, Page: strings.TrimPrefix(pageName, "/"), PageTitle: meta[0], PageSubtitle: meta[1], Projects: state.Projects, History: state.History, GitHubOn: h.GitHubConfigured(), HFOn: h.HFConfigured != nil && h.HFConfigured()}
 		v.SkillList, _ = h.Skills.List()
 		if r.URL.Path == "/skills" {
 			name := r.URL.Query().Get("name")
@@ -306,6 +345,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		h.mu.Lock()
 		h.sessions = make(map[string]session)
+		if err := h.saveSessionsLocked(); err != nil {
+			h.mu.Unlock()
+			http.Error(w, "No se pudo revocar las sesiones", 500)
+			return
+		}
 		h.failures = make(map[string]attempts)
 		h.global = attempts{}
 		h.mu.Unlock()
@@ -318,6 +362,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if c != nil {
 			h.mu.Lock()
 			delete(h.sessions, key(c.Value))
+			if err := h.saveSessionsLocked(); err != nil {
+				h.mu.Unlock()
+				http.Error(w, "No se pudo cerrar la sesión", 500)
+				return
+			}
 			h.mu.Unlock()
 		}
 		cookie(w, "__Host-kagmcp-session", "", -1)
@@ -366,7 +415,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	redirect := map[string]string{
+		"/github": "/integrations", "/huggingface": "/integrations",
+		"/project": "/projects", "/memory": "/projects", "/task": "/projects", "/task-status": "/projects",
+		"/export": "/projects", "/import": "/projects",
+	}
+	dest := redirect[r.URL.Path]
+	if dest == "" {
+		dest = "/dashboard"
+	}
+	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 func (h *Handler) page(w http.ResponseWriter, v view) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -417,6 +475,7 @@ func (h *Handler) metrics(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"time":    time.Now().UTC(),
 		"storage": diskguard.Usage("/kaggle/working"),
+		"runtime": h.monitor.Read(),
 		"gpu":     report,
 	})
 }

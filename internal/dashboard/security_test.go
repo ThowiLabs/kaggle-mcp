@@ -74,8 +74,8 @@ func TestLoginCookieCSRFAndProjects(t *testing.T) {
 	if valid.Code != 303 {
 		t.Fatalf("crear proyecto: %d, %s", valid.Code, valid.Body.String())
 	}
-	home := call(h, "GET", "/", nil, sessionCookie)
-	if home.Code != 200 || !strings.Contains(home.Body.String(), "Ponytail") || strings.Contains(home.Body.String(), "<script>alert(1)</script>") {
+	home := call(h, "GET", "/projects", nil, sessionCookie)
+	if home.Code != 200 || !strings.Contains(home.Body.String(), "Proyecto") || strings.Contains(home.Body.String(), "<script>alert(1)</script>") {
 		t.Fatalf("panel inválido: %s", home.Body.String()[:min(home.Body.Len(), 400)])
 	}
 	logout := call(h, "POST", "/logout", url.Values{"csrf": {csrf}}, sessionCookie)

@@ -201,3 +201,13 @@ El panel web en la **URL pública raíz** (`https://<tu-túnel>/`) reutiliza el 
 - **Dependencias del frontend:** ninguna CDN, paquetes JS o servicios de métricas nuevos. Se incrustaron estilos y logotipo de Axolotl bajo su licencia MIT (`internal/dashboard/ui/LICENSE.axolotl`).
 
 **Probar localmente:** `go test ./...`, `go vet ./...`, `node --check internal/dashboard/ui/dashboard.js`. **En Kaggle Linux:** activar GPU desde la configuración del notebook si se requiere, iniciar KagMCP y entrar al panel con el PIN temporal o configurado. Si no se activa GPU, el panel debe indicarlo sin inventar valores.
+
+## Monitor Axolotl real y navegación por páginas
+
+El panel usa rutas HTML protegidas individuales: `/dashboard`, `/resources`, `/projects`, `/activity`, `/integrations`, `/skills` y `/security`. Todas requieren la misma sesión autenticada; los formularios de proyectos y tokens regresan a sus secciones correspondientes.
+
+Los controles visuales de CPU y RAM se basan en el **monitor de servidor de la plantilla Axolotl**, pero se sustituyeron los datos de demostración por lecturas Linux. CPU: diferencial de `/sys/fs/cgroup/cpu.stat` y `cpu.max` normalizado por capacidad de contenedor; si no existe cgroup v2, lectura del host compartido `/proc/stat`, rotulada explícitamente. RAM: `memory.current` y `memory.max` del contenedor; como respaldo, `/proc/meminfo` marcado «Host compartido». Almacenamiento: filesystem de `/kaggle/working` por `statfs`; **no debe confundirse con una cuota total de Kaggle**. GPU: `nvidia-smi`; 0% representa una GPU realmente ociosa, «N/D» ausencia de medición. Solo se muestra «EN VIVO» si llegan mediciones reales de la API.
+
+**Sesión persistente:** cookie `__Host-`, `HttpOnly`, `Secure`, `SameSite=Strict` y vigencia fija de **7 días**. El servidor guarda solo el SHA-256 del token aleatorio y el CSRF en `/kaggle/working/.kagmcp/state/web-sessions.json`, archivo privado `0600`; conserva el acceso tras refrescar o reiniciar el proceso, mientras la cookie siga en el mismo origen HTTPS. Cerrar sesión o cambiar el PIN revoca los accesos. Si Gradio/Cloudflare cambia de dominio, las cookies del dominio anterior **no se transfieren**: es necesario iniciar sesión otra vez. El archivo persiste solo lo que persista `/kaggle/working` en Kaggle.
+
+**Pruebas:** `go test ./...`, `go vet ./...`, `node --check internal/dashboard/ui/dashboard.js` y compilación `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build ./cmd/kagssh`. El diseño se contrastó en Chrome headless; la telemetría real requiere una sesión de Kaggle para la prueba final.

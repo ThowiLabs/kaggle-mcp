@@ -1,132 +1,168 @@
 "use strict";
-(function () {
+(() => {
   const root = document.getElementById("app");
   if (!root) return;
-  const $ = (id) => document.getElementById(id);
-  const clamp = (v) => Math.max(0, Math.min(100, Number(v) || 0));
-  const asText = (id, value) => { const el = $(id); if (el) el.textContent = value; };
-  const fmtBytes = (n) => {
-    if (!Number.isFinite(n)) return "—";
-    const units = ["B", "KiB", "MiB", "GiB", "TiB"];
-    if (n < 1024) return n.toFixed(0) + " B";
-    const i = Math.min(4, Math.floor(Math.log(n) / Math.log(1024)));
-    return (n / 1024 ** i).toFixed(i >= 2 ? 1 : 0) + " " + units[i];
+  const el = id => document.getElementById(id);
+  const put = (id, value) => { const node=el(id); if(node) node.textContent=String(value); };
+  const pct = value => Number.isFinite(value) && value>=0 && value<=100;
+  const percent = n => !pct(n) ? "N/D" : (n > 0 && n < 1 ? n.toFixed(2) : n.toFixed(1)) + "%";
+  const bytes = n => {
+    if (!Number.isFinite(n) || n < 0) return "N/D";
+    const units=["B","KiB","MiB","GiB","TiB"];
+    if(n<1024) return n.toFixed(0)+" B";
+    let i=Math.min(4,Math.floor(Math.log(n)/Math.log(1024)));
+    return (n/Math.pow(1024,i)).toFixed(i>1?2:1)+" "+units[i];
   };
-  // Only telemetry reported by the server is rendered; no placeholder fake readings.
-  function ring(id, value) {
-    const el = $(id);
-    if (!el) return;
-    const from = Number(el.dataset.value || 0);
-    const to = clamp(value);
-    el.dataset.value = String(to);
-    el.setAttribute("aria-valuenow", String(Math.round(to)));
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      el.style.setProperty("--value", to + "%"); return;
-    }
-    const start = performance.now();
-    const animate = (now) => {
-      if (Number(el.dataset.value) !== to) return;
-      const t = Math.min(1, (now - start) / 650);
-      const eased = 1 - Math.pow(1 - t, 3);
-      el.style.setProperty("--value", (from + (to - from) * eased) + "%");
-      if (t < 1) requestAnimationFrame(animate);
+  const reduced=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Axolotl semicircle; style is calculated exclusively from measured percentages.
+  function gauge(id, n) {
+    const arc=el(id+"GaugeArc"), needle=el(id+"GaugeNeedle");
+    if(!arc || !needle)return;
+    const target=pct(n)?n:0;
+    const previous=Number(arc.dataset.pct||"0");
+    arc.dataset.pct=String(target);
+    const start=performance.now(), duration=reduced?0:500;
+    const frame=now=>{
+      if(Number(arc.dataset.pct)!==target)return;
+      const t=duration===0?1:Math.min(1,(now-start)/duration);
+      const value=previous+(target-previous)*(1-Math.pow(1-t,3));
+      arc.style.strokeDasharray="251.33";
+      arc.style.strokeDashoffset=(251.33*(1-value/100)).toFixed(2);
+      needle.setAttribute("transform","rotate("+(-90+value*1.8).toFixed(2)+" 105 105)");
+      if(t<1)requestAnimationFrame(frame);
     };
-    requestAnimationFrame(animate);
+    requestAnimationFrame(frame);
+    put(id+"GaugeValue",percent(n));
+    put(id+"TopValue",percent(n));
   }
-  let devices = [];
-  let activeGpu = 0;
-  function drawGPU() {
-    const gpu = devices[activeGpu];
-    if (!gpu) {
-      ring("gpuRing", 0);
-      asText("gpuPct", "—");
-      asText("gpuVram", "—");
-      asText("gpuVramTotal", "VRAM no disponible");
-      asText("gpuTemp", "—");
-      asText("gpuCount", "0");
+  function donut(n) {
+    const ring=el("gpuRing"); if(!ring)return;
+    const target=pct(n)?n:0, previous=Number(ring.dataset.pct||0);
+    ring.dataset.pct=String(target);
+    if(pct(n))ring.setAttribute("aria-valuenow",String(+n.toFixed(2)));
+    else ring.removeAttribute("aria-valuenow");
+    const started=performance.now(),duration=reduced?0:550;
+    const frame=now=>{
+      if(Number(ring.dataset.pct)!==target)return;
+      const t=duration===0?1:Math.min(1,(now-started)/duration);
+      const value=previous+(target-previous)*(1-(1-t)**3);
+      ring.style.setProperty("--gpu-fill",value+"%");
+      if(t<1)requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }
+  const monitor=!!el("server-metrics-section");
+  let selectedGPU=0,devices=[],topology="";
+  function drawGPU(){
+    const d=devices[selectedGPU];
+    if(!d){
+      put("gpuName","GPU NVIDIA no detectada");
+      ["gpuPct","gpuTopValue","gpuTemp","gpuVram","gpuVramTotal"].forEach(id=>put(id,"N/D"));
+      put("gpuCount",0);donut(null);
       return;
     }
-    const load = gpu.utilization_gpu_percent;
-    if (load == null) { ring("gpuRing", 0); asText("gpuPct", "N/D"); }
-    else { ring("gpuRing", load); asText("gpuPct", Math.round(load) + "%"); }
-    asText("gpuName", gpu.name || ("GPU " + gpu.index));
-    asText("gpuCount", String(devices.length));
-    asText("gpuTemp", gpu.temperature_celsius == null ? "N/D" : gpu.temperature_celsius + " °C");
-    asText("gpuVram", gpu.memory_used_mib == null ? "N/D" : (gpu.memory_used_mib / 1024).toFixed(2) + " GiB");
-    asText("gpuVramTotal", gpu.memory_total_mib == null ? "VRAM total N/D" : "de " + (gpu.memory_total_mib / 1024).toFixed(2) + " GiB de VRAM");
-    asText("gpuNote", gpu.memory_percent == null ? "Memoria GPU: N/D" : "Memoria GPU utilizada: " + gpu.memory_percent.toFixed(1) + "%");
+    put("gpuName",d.name || "GPU "+d.index);
+    put("gpuPct",percent(d.utilization_gpu_percent));
+    put("gpuTopValue",percent(d.utilization_gpu_percent));
+    put("gpuTemp",d.temperature_celsius==null?"N/D":d.temperature_celsius+" °C");
+    put("gpuVram",d.memory_used_mib==null?"N/D":bytes(d.memory_used_mib*1024**2));
+    put("gpuVramTotal",d.memory_total_mib==null?"N/D":bytes(d.memory_total_mib*1024**2));
+    put("gpuCount",devices.length);
+    donut(d.utilization_gpu_percent);
   }
-  function update(data) {
-    const disk = data.storage || {};
-    if (disk.available) {
-      ring("diskRing", disk.used_percent);
-      asText("diskPct", Math.round(disk.used_percent) + "%");
-      asText("diskUsed", fmtBytes(disk.used_bytes));
-      asText("diskTotal", "de " + fmtBytes(disk.total_bytes));
-      asText("diskFree", fmtBytes(disk.free_bytes));
-      asText("diskStatus", disk.used_percent > 95 ? "Crítico" : disk.used_percent > 85 ? "Atención" : "Disponible");
-      asText("diskNote", disk.used_percent > 95 ? "Espacio crítico: evita instalar paquetes pesados." : "Información real del volumen del runtime.");
-    } else {
-      ring("diskRing", 0);
-      asText("diskPct", "N/D");
-      asText("diskStatus", "No disponible");
-      asText("diskNote", disk.error || "No se pudo consultar este volumen.");
+  function update(metrics){
+    const runtime=metrics.runtime||{},cpu=runtime.cpu||{},ram=runtime.memory||{},disk=metrics.storage||{},gpu=metrics.gpu||{};
+    gauge("cpu",cpu.available?cpu.percent:null);
+    put("cpuSource",cpu.source==="cgroup-v2"?"Contenedor":cpu.source==="host"?"Host compartido":"N/D");
+    put("cpuCapacity",cpu.available?+cpu.capacity_cores.toFixed(2)+" CPU":"N/D");
+    put("cpuCores",cpu.available?cpu.logical_cores:"N/D");
+    gauge("ram",ram.available?ram.used_percent:null);
+    put("ramUsed",ram.available?bytes(ram.used_bytes):"N/D");
+    put("ramFree",ram.available?bytes(ram.free_bytes):"N/D");
+    put("ramTotal",ram.available?bytes(ram.total_bytes):"N/D");
+    put("ramSource",ram.source==="cgroup-v2"?"Contenedor":ram.source==="host"?"Host compartido":"N/D");
+    if(disk.available&&pct(disk.used_percent)){
+      put("diskTopValue",percent(disk.used_percent));
+      put("diskUsedText",bytes(disk.used_bytes)+" / "+bytes(disk.total_bytes));
+      put("diskUsed",bytes(disk.used_bytes));
+      put("diskFree",bytes(disk.free_bytes));
+      put("diskTotal",bytes(disk.total_bytes));
+      put("diskStatus",disk.used_percent>=95?"Crítico":disk.used_percent>=85?"Atención":"Disponible");
+      el("diskFill").style.width=disk.used_percent+"%";
+      el("diskMeter").setAttribute("aria-valuenow",String(+disk.used_percent.toFixed(2)));
+      put("diskNote","Filesystem de /kaggle/working; puede diferir de otras cuotas de Kaggle.");
+    }else{
+      ["diskTopValue","diskUsedText","diskUsed","diskFree","diskTotal"].forEach(id=>put(id,"N/D"));
+      put("diskStatus","Sin datos");
+      el("diskFill").style.width="0%";
+      el("diskMeter").removeAttribute("aria-valuenow");
+      put("diskNote",disk.error || "No se pudo leer el volumen Kaggle.");
     }
-    const report = data.gpu || {};
-    devices = report.gpus || [];
-    if (activeGpu >= devices.length) activeGpu = 0;
-    const selector = $("gpuDevices");
-    selector.replaceChildren();
-    devices.forEach((device, i) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.textContent = "GPU " + device.index;
-      btn.classList.toggle("selected", i === activeGpu);
-      btn.addEventListener("click", () => {
-        activeGpu = i;
-        selector.querySelectorAll("button").forEach((b, n) => b.classList.toggle("selected", n === i));
-        drawGPU();
+    devices=Array.isArray(gpu.gpus) && gpu.available?gpu.gpus:[];
+    const next=devices.map(d=>d.uuid||d.index).join("|");
+    if(next!==topology) {
+      topology=next;selectedGPU=0;
+      const host=el("gpuDevices");host.replaceChildren();
+      devices.forEach((device,i)=>{
+        const btn=document.createElement("button");
+        btn.type="button";btn.textContent="GPU "+device.index;
+        btn.addEventListener("click",()=>{
+          selectedGPU=i;
+          host.querySelectorAll("button").forEach((b,j)=>b.classList.toggle("selected",j===i));
+          drawGPU();
+        });
+        btn.classList.toggle("selected",i===0);
+        host.appendChild(btn);
       });
-      selector.append(btn);
-    });
-    if (devices.length) {
-      asText("gpuStatus", "Activa");
-      asText("runtimeState", "En línea");
-    } else {
-      asText("gpuStatus", "Sin acelerador");
-      asText("gpuName", "No hay GPU NVIDIA activa");
-      asText("gpuNote", report.hint || report.reason || "Activa GPU desde Kaggle si la necesitas.");
-      asText("runtimeState", disk.available ? "En línea" : "Sin métricas");
     }
+    if(selectedGPU>=devices.length) selectedGPU=0;
     drawGPU();
-    asText("connectionStatus", "Monitorización activa");
-    asText("lastUpdated", "Actualizado " + new Date(data.time || Date.now()).toLocaleTimeString("es-MX"));
+    put("gpuNote",devices.length?"Datos de nvidia-smi; una GPU inactiva puede mostrar 0%.":(gpu.hint||gpu.reason||"Sin GPU NVIDIA disponible."));
+    const ok=cpu.available||ram.available||disk.available||gpu.available;
+    put("serverStatus",ok?"Datos recibidos":"Sin telemetría");
+    el("serverStatus")?.classList.toggle("is-live",ok);
+    el("liveIndicator")?.classList.toggle("is-live",ok);
+    document.querySelector(".sidebar-bottom")?.classList.toggle("is-live",ok);
+    put("liveLabel",ok?"EN VIVO":"SIN DATOS");
+    put("runtimeState",ok?"En línea":"Datos N/D");
+    put("connectionStatus",ok?"Telemetría activa":"Sin mediciones");
+    put("lastUpdated",metrics.time?"Actualizado "+new Date(metrics.time).toLocaleTimeString("es-MX"):"Sin hora disponible");
+    put("monitorNote","Muestras reales · CPU "+(cpu.source||"N/D")+" · RAM "+(ram.source||"N/D")+" · GPU "+(gpu.backend||"N/D"));
   }
-  let busy = false;
-  async function refresh() {
-    if (busy || document.hidden) return;
-    busy = true;
-    try {
-      const response = await fetch("/api/metrics", { credentials:"same-origin", cache:"no-store", headers:{"Accept":"application/json"} });
-      if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) throw new Error("Sin acceso a telemetría");
+  let busy=false;
+  async function refresh(){
+    if(busy||document.hidden||!monitor)return;
+    busy=true;
+    try{
+      const response=await fetch("/api/metrics",{cache:"no-store",credentials:"same-origin",headers:{Accept:"application/json"}});
+      if(response.status===401||response.redirected){location.assign("/login");return}
+      if(!response.ok)throw new Error("HTTP "+response.status);
       update(await response.json());
-    } catch (_err) {
-      asText("connectionStatus", "Telemetría desconectada");
-      asText("runtimeState", "Sin conexión");
-      asText("lastUpdated", "Sin actualización");
-      asText("gpuStatus", "Sin conexión");
-      asText("diskStatus", "Sin conexión");
-    } finally { busy = false; }
+    }catch(error){
+      put("serverStatus","Sin conexión");
+      el("serverStatus")?.classList.remove("is-live");
+      el("liveIndicator")?.classList.remove("is-live");
+      document.querySelector(".sidebar-bottom")?.classList.remove("is-live");
+      put("liveLabel","SIN CONEXIÓN");
+      put("runtimeState","Sin conexión");
+      put("connectionStatus","Telemetría desconectada");
+      put("lastUpdated","Fallo de lectura");
+      put("monitorNote","No hay una lectura reciente. Comprueba la conexión con KagMCP.");
+      gauge("cpu",null);gauge("ram",null);
+      ["diskTopValue","diskUsedText","diskUsed","diskFree","diskTotal","diskStatus",
+        "ramUsed","ramFree","ramTotal","ramSource","cpuSource","cpuCapacity","cpuCores",
+        "gpuPct","gpuTopValue","gpuName","gpuTemp","gpuVram","gpuVramTotal","gpuCount"
+      ].forEach(id=>put(id,"N/D"));
+      const fill=el("diskFill");if(fill)fill.style.width="0%";
+      el("diskMeter")?.removeAttribute("aria-valuenow");
+      devices=[];topology="";
+      el("gpuDevices")?.replaceChildren();
+      donut(null);
+    }finally{busy=false}
   }
-  const collapse = $("collapseBtn");
-  collapse?.addEventListener("click", () => root.classList.toggle("sidebar-collapsed"));
-  $("menuBtn")?.addEventListener("click", () => root.classList.add("mobile-open"));
-  $("mobileBackdrop")?.addEventListener("click", () => root.classList.remove("mobile-open"));
-  document.querySelectorAll(".sidebar .nav-item").forEach(link => link.addEventListener("click", () => {
-    root.classList.remove("mobile-open");
-    document.querySelectorAll(".sidebar .nav-item").forEach(a => a.classList.toggle("active", a === link));
-  }));
-  refresh();
-  setInterval(refresh, 5000);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+  el("collapseBtn")?.addEventListener("click",()=>root.classList.toggle("sidebar-collapsed"));
+  el("menuBtn")?.addEventListener("click",()=>root.classList.add("mobile-open"));
+  el("mobileBackdrop")?.addEventListener("click",()=>root.classList.remove("mobile-open"));
+  document.querySelectorAll(".sidebar .nav-item").forEach(a=>a.addEventListener("click",()=>root.classList.remove("mobile-open")));
+  if(monitor){refresh();setInterval(refresh,5000);document.addEventListener("visibilitychange",()=>{if(!document.hidden)refresh()})}
 })();
