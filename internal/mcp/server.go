@@ -448,7 +448,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.rpc(w, resp)
 }
 
-const mcpInstructions = skills.Summary + " SUBAGENTES OPCIONALES: antes de usar agent_task_create pregunta SIEMPRE al usuario si desea delegar esta tarea concreta; si responde NO, trabaja aquí sin subagente. Solo si responde SÍ usa user_approved=true, conserva MCP destino explícito, ruta exacta y rama aislada. No creas ni abras chats automáticamente. Diferencia MCP coordinador KagMCP y MCP destino. Un subagente entrega needs_review/blocked; jamás se autoaprueba, hace merge ni push sin autorización. Ejecuta skills_read(ponytail-v2) al iniciar trabajo. PRIORIDAD GITHUB: para consultar o modificar contenido remoto en GitHub utiliza PRIMERO las herramientas github_* de este MCP (github_status, github_repositories, github_file_read/write, github_api, github_graphql, etc.) cuando estén disponibles y autorizadas; evita exec/git manual para operaciones remotas ya cubiertas. No realices operaciones destructivas sin autorización explícita. Si GITHUB_TOKEN falta, solicita configurarlo en el panel, no inventes acceso. Para proyectos locales Kaggle usa herramientas locales autorizadas. En Kaggle cada prueba termina con repositorio Git y notebook funcional; después de verificarlos, una UI Gradio. Fija versiones, vigila espacio libre para evitar readonly, registra descripción/proyecto de comandos, memoria y tareas. Los datos de /kaggle/input solo lectura. No reveles secretos."
+const mcpInstructions = skills.Summary + " SUBAGENTES OPCIONALES: antes de usar agent_task_create pregunta SIEMPRE al usuario si desea delegar esta tarea concreta; si responde NO, trabaja aquí sin subagente. Solo si responde SÍ usa user_approved=true, conserva MCP destino explícito, ruta exacta y rama aislada. No creas ni abras chats automáticamente. Diferencia MCP coordinador KagMCP y MCP destino. Un subagente entrega needs_review/blocked; jamás se autoaprueba, hace merge ni push sin autorización. Ejecuta skills_read(ponytail-v2) al iniciar trabajo. PRIORIDAD GITHUB: para consultar o modificar contenido remoto en GitHub utiliza PRIMERO las herramientas github_* de este MCP (incluyendo github_tag_*, github_workflow_*, github_file_upload, github_release_asset_upload y github_api/graphql) cuando estén disponibles y autorizadas; pide consentimiento específico para crear tags, editar/ejecutar workflows, subir archivos, borrar recursos o fusionar PRs. No inventes estado de GitHub ni asumas permisos del PAT; evita exec/git manual para operaciones remotas ya cubiertas. No realices operaciones destructivas sin autorización explícita. Si GITHUB_TOKEN falta, solicita configurarlo en el panel, no inventes acceso. Para proyectos locales Kaggle usa herramientas locales autorizadas. En Kaggle cada prueba termina con repositorio Git y notebook funcional; después de verificarlos, una UI Gradio. Fija versiones, vigila espacio libre para evitar readonly, registra descripción/proyecto de comandos, memoria y tareas. Los datos de /kaggle/input solo lectura. No reveles secretos."
 
 func (s *Server) rpc(w http.ResponseWriter, v response) {
 	s.rpcStatus(w, http.StatusOK, v)
@@ -535,8 +535,37 @@ func (s *Server) definitions() []any {
 		def("github_issue_create", "Crear Issue.", map[string]any{"repository": stringProp("repository"), "title": stringProp("title"), "body": stringProp("body")}, "repository", "title"),
 		def("github_issue_update", "Actualizar Issue con JSON de campos.", map[string]any{"repository": stringProp("repository"), "number": map[string]any{"type": "integer"}, "json_body": stringProp("json_body")}, "repository", "number", "json_body"),
 		def("github_release_create", "Crear Release de GitHub.", map[string]any{"repository": stringProp("repository"), "tag_name": stringProp("tag_name"), "name": stringProp("name"), "body": stringProp("body")}, "repository", "tag_name"),
-		def("github_workflow_dispatch", "Ejecutar workflow de GitHub Actions.", map[string]any{"repository": stringProp("repository"), "workflow": stringProp("workflow"), "ref": stringProp("ref"), "inputs": stringProp("inputs")}, "repository", "workflow", "ref"),
+		def("github_workflow_dispatch", "Ejecuta workflow de GitHub Actions si dispone de workflow_dispatch; puede consumir minutos y exige confirmación explícita.", map[string]any{"repository": stringProp("repository"), "workflow": stringProp("workflow"), "ref": stringProp("ref"), "inputs": stringProp("inputs"), "confirmed": map[string]any{"type": "boolean"}}, "repository", "workflow", "ref", "confirmed"),
 		def("github_workflows", "Listar workflows de GitHub Actions.", map[string]any{"repository": stringProp("repository")}, "repository"),
+		def("github_tag_create", "Crea tag ligero/anotado sin sobrescribir refs; puede disparar Actions, requiere confirmación explícita.", map[string]any{
+			"repository": stringProp("owner/repo"), "tag_name": stringProp("Nombre de tag v1.2.3"), "sha": stringProp("SHA Git completo del commit"), "tag_message": stringProp("Mensaje opcional para tag anotado"), "confirmed": map[string]any{"type": "boolean"},
+		}, "repository", "tag_name", "sha", "confirmed"),
+		def("github_tag_list", "Lista hasta 100 tags del repositorio", map[string]any{"repository": stringProp("owner/repo")}, "repository"),
+		def("github_tag_delete", "BORRA un tag; requiere autorización explícita confirmed=true.", map[string]any{"repository": stringProp("owner/repo"), "tag_name": stringProp("Nombre tag"), "confirmed": map[string]any{"type": "boolean"}}, "repository", "tag_name", "confirmed"),
+		def("github_file_upload", "Sube archivo binario local de /kaggle/working al repo (máx 1 MiB). Si se actualiza requiere SHA anterior. Confirmar publicación.", map[string]any{
+			"repository": stringProp("owner/repo"), "local_path": stringProp("Ruta absoluta /kaggle/working/..."), "path": stringProp("Ruta destino dentro del repo"), "branch": stringProp("Rama de destino"), "message": stringProp("Mensaje commit"), "sha": stringProp("SHA de contenido anterior si se actualiza"), "confirmed": map[string]any{"type": "boolean"},
+		}, "repository", "local_path", "path", "branch", "message", "confirmed"),
+		def("github_release_asset_upload", "Publica archivo ZIP/binario local /kaggle/working como adjunto de Release existente (máx 50 MiB). Confirmación explícita.", map[string]any{
+			"repository": stringProp("owner/repo"), "release_id": map[string]any{"type": "integer"}, "local_path": stringProp("Archivo absoluto /kaggle/working"), "file_name": stringProp("Nombre remoto opcional"), "confirmed": map[string]any{"type": "boolean"},
+		}, "repository", "release_id", "local_path", "confirmed"),
+		def("github_workflow_upsert", "Crea o actualiza .github/workflows/archivo.yml por API. Requiere permiso Workflows write y confirmación explícita. Nunca ejecuta workflow automáticamente.", map[string]any{
+			"repository": stringProp("owner/repo"), "workflow": stringProp("archivo.yml o .yaml"), "workflow_yaml": stringProp("Contenido YAML"), "branch": stringProp("Rama destino"), "message": stringProp("Mensaje de commit"), "sha": stringProp("SHA archivo anterior requerido al actualizar"), "confirmed": map[string]any{"type": "boolean"},
+		}, "repository", "workflow", "workflow_yaml", "branch", "message", "confirmed"),
+		def("github_workflow_set_state", "Habilita/deshabilita un workflow; confirmación explícita obligatoria.", map[string]any{
+			"repository": stringProp("owner/repo"), "workflow": stringProp("Archivo o ID workflow"), "state": stringProp("enable o disable"), "confirmed": map[string]any{"type": "boolean"},
+		}, "repository", "workflow", "state", "confirmed"),
+		def("github_workflow_runs", "Lista hasta 30 ejecuciones de Actions en un repo o workflow concreto.", map[string]any{
+			"repository": stringProp("owner/repo"), "workflow": stringProp("Archivo/ID workflow opcional"),
+		}, "repository"),
+		def("github_workflow_run", "Consulta estado y conclusión de una ejecución de Actions.", map[string]any{
+			"repository": stringProp("owner/repo"), "run_id": map[string]any{"type": "integer"},
+		}, "repository", "run_id"),
+		def("github_workflow_rerun", "Vuelve a ejecutar un workflow; consume minutos. Requiere confirmación explícita.", map[string]any{
+			"repository": stringProp("owner/repo"), "run_id": map[string]any{"type": "integer"}, "confirmed": map[string]any{"type": "boolean"},
+		}, "repository", "run_id", "confirmed"),
+		def("github_workflow_cancel", "Cancela workflow run. Requiere confirmación explícita.", map[string]any{
+			"repository": stringProp("owner/repo"), "run_id": map[string]any{"type": "integer"}, "confirmed": map[string]any{"type": "boolean"},
+		}, "repository", "run_id", "confirmed"),
 	}
 }
 func (s *Server) invoke(ctx context.Context, name string, raw json.RawMessage) (any, error) {

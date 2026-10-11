@@ -14,9 +14,10 @@ import (
 )
 
 type Client struct {
-	token string
-	http  *http.Client
-	base  string
+	token      string
+	http       *http.Client
+	base       string
+	uploadBase string
 }
 
 func New(token string) *Client {

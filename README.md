@@ -223,3 +223,7 @@ Los controles visuales de CPU y RAM se basan en el **monitor de servidor de la p
 ## Agent Orchestrator (delegación opcional)
 
 KagMCP incorpora la página **/agents** y herramientas MCP de delegación para coordinar varios chats con MCP de trabajo explícito, carpeta y rama. Solo prepara asignaciones cuando el usuario responde **Sí** y confirma el formulario; nunca inicia chats automáticamente. Las entregas quedan `needs_review` o `blocked`, con aprobación y cancelación controladas desde la sesión del panel. Consulta [AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md) para el flujo, herramientas y límites de seguridad/comercialización.
+
+## GitHub avanzado desde ChatGPT
+
+El MCP incluye tags (ligeros/anotados), Actions (workflow YAML, enable/disable, dispatch, runs, rerun y cancelación), subidas binarias de archivos locales a repositorios y adjuntos de Releases, además de `github_api` / `github_graphql`. Se requiere GITHUB_TOKEN autorizado y confirmación para acciones con efectos remotos. Consulta [GITHUB_CAPACIDADES.md](GITHUB_CAPACIDADES.md) para los permisos del PAT, ejemplos y límites de tamaño.
