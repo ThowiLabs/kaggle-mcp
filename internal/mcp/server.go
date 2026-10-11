@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ThowiLabs/kagssh-go/internal/agenttasks"
 	"github.com/ThowiLabs/kagssh-go/internal/config"
 	"github.com/ThowiLabs/kagssh-go/internal/dashboard"
 	"github.com/ThowiLabs/kagssh-go/internal/diskguard"
@@ -65,6 +66,7 @@ type Server struct {
 	hfMu         sync.RWMutex
 	hfToken      string
 	projects     *projectstate.Store
+	agents       *agenttasks.Store
 	skills       skills.Registry
 }
 
@@ -100,6 +102,10 @@ func New(cfg config.Config, public string) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cargar proyectos: %w", err)
 	}
+	agents, err := agenttasks.Open(filepath.Join(cfg.DataDir, "state", "agent-tasks.json"))
+	if err != nil {
+		return nil, fmt.Errorf("cargar delegaciones: %w", err)
+	}
 
 	// Los Kaggle Secrets también estarán disponibles para comandos del runtime.
 	if cfg.GitHubToken != "" {
@@ -112,7 +118,7 @@ func New(cfg config.Config, public string) (*Server, error) {
 			return nil, err
 		}
 	}
-	return &Server{cfg: cfg, public: public, auth: auth, pinState: pinState, generatedPIN: generated, github: githubtoken.New(cfg.GitHubToken), githubOn: cfg.GitHubToken != "", hfToken: cfg.HFToken, projects: projects, skills: skills.Registry{Dir: filepath.Join(cfg.DataDir, "skills")}}, nil
+	return &Server{cfg: cfg, public: public, auth: auth, pinState: pinState, generatedPIN: generated, github: githubtoken.New(cfg.GitHubToken), githubOn: cfg.GitHubToken != "", hfToken: cfg.HFToken, projects: projects, agents: agents, skills: skills.Registry{Dir: filepath.Join(cfg.DataDir, "skills")}}, nil
 }
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -122,6 +128,7 @@ func (s *Server) Handler() http.Handler {
 	panel := dashboard.New(s.public, s.pinState, s.auth.ResetOwner, s.projects, s.skills, s.configureGitHub, s.githubConfigured, s.projectExport, s.projectImport)
 	panel.HuggingFace = s.configureHF
 	panel.HFConfigured = s.hfConfigured
+	panel.Agents = s.agents
 	if err := panel.EnablePersistence(filepath.Join(s.cfg.DataDir, "state", "web-sessions.json")); err != nil {
 		slog.Error("no se pudo cargar las sesiones persistentes", "error", err)
 		// Un estado inválido no permite un fallback silencioso a sesiones efímeras.
@@ -441,7 +448,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.rpc(w, resp)
 }
 
-const mcpInstructions = skills.Summary + " Ejecuta skills_read(ponytail-v2) al iniciar trabajo. PRIORIDAD GITHUB: para consultar o modificar contenido remoto en GitHub utiliza PRIMERO las herramientas github_* de este MCP (github_status, github_repositories, github_file_read/write, github_api, github_graphql, etc.) cuando estén disponibles y autorizadas; evita exec/git manual para operaciones remotas ya cubiertas. No realices operaciones destructivas sin autorización explícita. Si GITHUB_TOKEN falta, solicita configurarlo en el panel, no inventes acceso. Para proyectos locales Kaggle usa herramientas locales autorizadas. En Kaggle cada prueba termina con repositorio Git y notebook funcional; después de verificarlos, una UI Gradio. Fija versiones, vigila espacio libre para evitar readonly, registra descripción/proyecto de comandos, memoria y tareas. Los datos de /kaggle/input solo lectura. No reveles secretos."
+const mcpInstructions = skills.Summary + " SUBAGENTES OPCIONALES: antes de usar agent_task_create pregunta SIEMPRE al usuario si desea delegar esta tarea concreta; si responde NO, trabaja aquí sin subagente. Solo si responde SÍ usa user_approved=true, conserva MCP destino explícito, ruta exacta y rama aislada. No creas ni abras chats automáticamente. Diferencia MCP coordinador KagMCP y MCP destino. Un subagente entrega needs_review/blocked; jamás se autoaprueba, hace merge ni push sin autorización. Ejecuta skills_read(ponytail-v2) al iniciar trabajo. PRIORIDAD GITHUB: para consultar o modificar contenido remoto en GitHub utiliza PRIMERO las herramientas github_* de este MCP (github_status, github_repositories, github_file_read/write, github_api, github_graphql, etc.) cuando estén disponibles y autorizadas; evita exec/git manual para operaciones remotas ya cubiertas. No realices operaciones destructivas sin autorización explícita. Si GITHUB_TOKEN falta, solicita configurarlo en el panel, no inventes acceso. Para proyectos locales Kaggle usa herramientas locales autorizadas. En Kaggle cada prueba termina con repositorio Git y notebook funcional; después de verificarlos, una UI Gradio. Fija versiones, vigila espacio libre para evitar readonly, registra descripción/proyecto de comandos, memoria y tareas. Los datos de /kaggle/input solo lectura. No reveles secretos."
 
 func (s *Server) rpc(w http.ResponseWriter, v response) {
 	s.rpcStatus(w, http.StatusOK, v)
@@ -492,6 +499,15 @@ func (s *Server) definitions() []any {
 		def("read_file", "Lee un archivo de texto Kaggle hasta 1 MiB", map[string]any{"path": stringProp("Ruta a leer")}, "path"),
 		def("write_file", "Escribe un archivo en /kaggle/working hasta 1 MiB", map[string]any{"path": stringProp("Ruta a escribir"), "content": stringProp("Contenido completo")}, "path", "content"),
 		def("exec", "Ejecuta un comando en el runtime Kaggle con timeout y salida limitada", map[string]any{"command": stringProp("Comando shell"), "cwd": stringProp("Directorio de trabajo en /kaggle/working"), "project": stringProp("ID de proyecto, para historial"), "description": stringProp("Descripción del propósito del comando")}, "command", "description"),
+		def("agent_task_create", "Crea asignación de subagente SOLO después de preguntar y obtener consentimiento explícito del usuario. Nunca delegar automáticamente. No inicia chats, no otorga permisos al MCP destino.", map[string]any{
+			"title": stringProp("Título"), "objective": stringProp("Trabajo específico"), "mcp": stringProp("Nombre literal del conector destino, ejemplo $pl0"), "mcp_id": stringProp("ID opcional de instancia"), "workspace": stringProp("Ruta absoluta de trabajo en el MCP destino"), "branch": stringProp("Rama/worktree aislado"), "allowed_paths": map[string]any{"type": "array", "items": map[string]any{"type": "string"}}, "criteria": stringProp("Criterios de aceptación"), "context": stringProp("Contexto necesario"), "user_approved": map[string]any{"type": "boolean", "description": "Verdadero SOLO si el usuario confirmó que desea delegar esta tarea en concreto"},
+		}, "title", "objective", "mcp", "workspace", "branch", "allowed_paths", "criteria", "context", "user_approved"),
+		def("agent_task_list", "Lista tareas de subagentes del coordinador KagMCP", map[string]any{}),
+		def("agent_task_status", "Consulta estado y entrega de una tarea", map[string]any{"id": stringProp("ID exacto")}, "id"),
+		def("agent_task_prompt", "Recupera prompt generado para copiarlo al chat secundario", map[string]any{"id": stringProp("ID exacto")}, "id"),
+		def("agent_task_review", "Orquestador: obtiene entrega y checklist para revisar commit/diff/pruebas. SOLO LECTURA; la aprobación requiere usuario en /agents.", map[string]any{"id": stringProp("ID exacto")}, "id"),
+		def("agent_task_open", "Subagente reclama tarea pendiente con su nombre de agente; debe verificar MCP destino antes de editar", map[string]any{"id": stringProp("ID exacto"), "agent": stringProp("Nombre único del subagente")}, "id", "agent"),
+		def("agent_task_submit", "Entrega commit y tests para revisión humana; o declara bloqueo. No aprueba, fusiona ni publica cambios.", map[string]any{"id": stringProp("ID exacto"), "agent": stringProp("Nombre reclamante"), "status": stringProp("needs_review o blocked"), "commit": stringProp("SHA commit producido"), "tests": stringProp("Pruebas con resultados"), "summary": stringProp("Resumen de cambios"), "blocker": stringProp("Motivo de bloqueo")}, "id", "agent", "status"),
 		def("projects_list", "Lista los proyectos y su memoria/tareas compartidas", map[string]any{}),
 		def("project_create", "Crea un proyecto multiagente", map[string]any{"project": stringProp("ID único"), "title": stringProp("Nombre"), "repository": stringProp("owner/repo"), "notebook": stringProp("ruta al .ipynb")}, "project", "title"),
 		def("project_memory_add", "Guarda una decisión técnica persistente", map[string]any{"project": stringProp("ID del proyecto"), "content": stringProp("Nota de contexto")}, "project", "content"),
@@ -524,6 +540,9 @@ func (s *Server) definitions() []any {
 	}
 }
 func (s *Server) invoke(ctx context.Context, name string, raw json.RawMessage) (any, error) {
+	if agentTool(name) {
+		return s.invokeAgent(ctx, name, raw)
+	}
 	if gpuTool(name) {
 		return invokeGPU(ctx, name, raw, gpumetrics.New())
 	}

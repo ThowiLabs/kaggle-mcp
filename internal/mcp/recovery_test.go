@@ -106,7 +106,7 @@ func TestReconnectedServerPreservesChangedPINAndProjectsButRenewsOAuth(t *testin
 	if renewed.pinState != old.pinState || !renewed.pinState.Verify("NEW-PIN-UNIQUE-123") || renewed.pinState.Verify("LONG-TEST-PIN-ABC") {
 		t.Fatal("se perdió PIN modificado")
 	}
-	if old.projects != renewed.projects || old.skills.Dir != renewed.skills.Dir {
+	if old.projects != renewed.projects || old.agents != renewed.agents || old.skills.Dir != renewed.skills.Dir {
 		t.Fatal("se perdió memoria/proyectos/skills")
 	}
 	if renewed.githubClient() != old.githubClient() || !renewed.githubConfigured() {

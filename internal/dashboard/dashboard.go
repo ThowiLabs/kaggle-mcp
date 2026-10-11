@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/ThowiLabs/kagssh-go/internal/agenttasks"
 	"github.com/ThowiLabs/kagssh-go/internal/diskguard"
 	"github.com/ThowiLabs/kagssh-go/internal/gpumetrics"
 	"github.com/ThowiLabs/kagssh-go/internal/pinauth"
@@ -39,6 +40,7 @@ type Handler struct {
 	pin              *pinauth.State
 	revokePIN        func() error
 	Projects         *projectstate.Store
+	Agents           *agenttasks.Store
 	Skills           skills.Registry
 	GitHub           func(context.Context, string) (string, error)
 	GitHubConfigured func() bool
@@ -239,6 +241,7 @@ var pageDescriptions = map[string][2]string{
 	"/dashboard":    {"Dashboard", "Estado de CPU, memoria, GPU y disco de Kaggle"},
 	"/resources":    {"Recursos Kaggle", "Telemetría detallada del runtime, sin valores de demostración"},
 	"/projects":     {"Proyectos", "Administra proyectos, tareas y memoria compartida"},
+	"/agents":       {"Agentes", "Delegación opcional entre chats y revisión de entregas"},
 	"/activity":     {"Actividad", "Registro de comandos ejecutados por los agentes"},
 	"/integrations": {"Integraciones", "Tokens de GitHub y Hugging Face"},
 	"/skills":       {"Skills", "Habilidades y documentación de los agentes"},
@@ -259,6 +262,9 @@ type view struct {
 	Message      string
 	Projects     []projectstate.Project
 	Activity     projectstate.HistoryPage
+	AgentList    []agenttasks.Task
+	AgentCurrent *agenttasks.Task
+	AgentPrompt  string
 	SkillList    []skills.Info
 	SkillContent string
 	SkillName    string
@@ -280,7 +286,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.login(w, r)
 		return
 	}
-	if r.URL.Path != "/" && r.URL.Path != "/dashboard" && r.URL.Path != "/resources" && r.URL.Path != "/projects" && r.URL.Path != "/activity" && r.URL.Path != "/integrations" && r.URL.Path != "/security" && r.URL.Path != "/skills" && r.URL.Path != "/project" && r.URL.Path != "/memory" && r.URL.Path != "/task" && r.URL.Path != "/task-status" && r.URL.Path != "/github" && r.URL.Path != "/huggingface" && r.URL.Path != "/api/metrics" && r.URL.Path != "/api/activity" && r.URL.Path != "/export" && r.URL.Path != "/import" && r.URL.Path != "/change-pin" && r.URL.Path != "/logout" {
+	if r.URL.Path != "/" && r.URL.Path != "/dashboard" && r.URL.Path != "/resources" && r.URL.Path != "/projects" && r.URL.Path != "/agents" && r.URL.Path != "/agent-create" && r.URL.Path != "/agent-review" && r.URL.Path != "/agent-cancel" && r.URL.Path != "/activity" && r.URL.Path != "/integrations" && r.URL.Path != "/security" && r.URL.Path != "/skills" && r.URL.Path != "/project" && r.URL.Path != "/memory" && r.URL.Path != "/task" && r.URL.Path != "/task-status" && r.URL.Path != "/github" && r.URL.Path != "/huggingface" && r.URL.Path != "/api/metrics" && r.URL.Path != "/api/activity" && r.URL.Path != "/export" && r.URL.Path != "/import" && r.URL.Path != "/change-pin" && r.URL.Path != "/logout" {
 		http.NotFound(w, r)
 		return
 	}
@@ -331,6 +337,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		if pageName == "/activity" {
 			v.Activity = h.Projects.HistoryPage(page)
+		}
+		if pageName == "/agents" && h.Agents != nil {
+			v.AgentList = h.Agents.List()
+			if id := r.URL.Query().Get("created"); id != "" {
+				if task, e := h.Agents.Get(id); e == nil {
+					v.AgentCurrent = &task
+					v.AgentPrompt = agenttasks.Prompt(task)
+				}
+			}
 		}
 		if pageName == "/skills" {
 			v.SkillList, _ = h.Skills.List()
@@ -399,6 +414,35 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	var err error
 	switch r.URL.Path {
+	case "/agent-create":
+		if h.Agents == nil {
+			err = errors.New("delegación no disponible")
+			break
+		}
+		spec := agenttasks.Spec{
+			Title: r.FormValue("title"), Objective: r.FormValue("objective"), MCP: r.FormValue("mcp"),
+			MCPID: r.FormValue("mcp_id"), Workspace: r.FormValue("workspace"), Branch: r.FormValue("branch"),
+			AllowedPaths: strings.Fields(r.FormValue("allowed_paths")), Criteria: r.FormValue("criteria"), Context: r.FormValue("context"),
+			UserApproved: r.FormValue("user_approved") == "yes",
+		}
+		var task agenttasks.Task
+		task, err = h.Agents.Create(spec)
+		if err == nil {
+			http.Redirect(w, r, "/agents?created="+task.ID, http.StatusSeeOther)
+			return
+		}
+	case "/agent-review":
+		if h.Agents == nil {
+			err = errors.New("revisión no disponible")
+			break
+		}
+		_, err = h.Agents.Review(r.FormValue("id"), r.FormValue("decision"), r.FormValue("note"))
+	case "/agent-cancel":
+		if h.Agents == nil {
+			err = errors.New("cancelación no disponible")
+			break
+		}
+		_, err = h.Agents.Cancel(r.FormValue("id"), r.FormValue("note"))
 	case "/project":
 		err = h.Projects.Create(r.FormValue("id"), r.FormValue("name"), r.FormValue("repository"), r.FormValue("notebook"))
 	case "/memory":
@@ -443,6 +487,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"/github": "/integrations", "/huggingface": "/integrations",
 		"/project": "/projects", "/memory": "/projects", "/task": "/projects", "/task-status": "/projects",
 		"/export": "/projects", "/import": "/projects",
+		"/agent-create": "/agents", "/agent-review": "/agents", "/agent-cancel": "/agents",
 	}
 	dest := redirect[r.URL.Path]
 	if dest == "" {

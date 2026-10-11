@@ -173,8 +173,14 @@ func TestAllMCPToolSchemasWellFormedAndNotDuplicated(t *testing.T) {
 				t.Fatalf("%s.%s has invalid schema", name, prop)
 			}
 			kind, ok := shape["type"].(string)
-			if !ok || (kind != "string" && kind != "integer" && kind != "boolean") {
+			if !ok || (kind != "string" && kind != "integer" && kind != "boolean" && kind != "array") {
 				t.Fatalf("%s.%s invalid type %v", name, prop, shape["type"])
+			}
+			if kind == "array" {
+				items, valid := shape["items"].(map[string]any)
+				if !valid || items["type"] != "string" {
+					t.Fatalf("%s.%s array requires string items", name, prop)
+				}
 			}
 		}
 		if required, exists := schema["required"]; exists {

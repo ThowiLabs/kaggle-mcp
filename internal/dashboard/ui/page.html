@@ -40,6 +40,7 @@
       <a class="nav-item {{if eq .Page "dashboard"}}active{{end}}" href="/dashboard" aria-label="Dashboard" title="Dashboard"><span class="nav-icon">▦</span><span>Dashboard</span></a>
       <a class="nav-item {{if eq .Page "resources"}}active{{end}}" href="/resources" aria-label="Recursos Kaggle" title="Recursos Kaggle"><span class="nav-icon">◉</span><span>Recursos Kaggle</span></a>
       <a class="nav-item {{if eq .Page "projects"}}active{{end}}" href="/projects" aria-label="Proyectos" title="Proyectos"><span class="nav-icon">▤</span><span>Proyectos</span></a>
+      <a class="nav-item {{if eq .Page "agents"}}active{{end}}" href="/agents" aria-label="Agentes" title="Agentes"><span class="nav-icon">◎</span><span>Agentes</span></a>
       <a class="nav-item {{if eq .Page "activity"}}active{{end}}" href="/activity" aria-label="Actividad" title="Actividad"><span class="nav-icon">◷</span><span>Actividad</span></a>
       <div class="nav-label">SISTEMA</div>
       <a class="nav-item {{if eq .Page "integrations"}}active{{end}}" href="/integrations" aria-label="Integraciones" title="Integraciones"><span class="nav-icon">⚙</span><span>Integraciones</span></a>
@@ -184,6 +185,73 @@
         <div class="project-columns"><div><h4>Memoria</h4>{{range .Memory}}<p class="entry">{{.}}</p>{{else}}<p class="muted">Sin notas todavía.</p>{{end}}<form action="/memory" method="post"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{.ID}}"><textarea name="text" placeholder="Guardar decisión o contexto..." maxlength="6000" required></textarea><button>Guardar nota</button></form></div><div><h4>Tareas</h4>{{range .Tasks}}<div class="task-row"><div><strong>{{.Title}}</strong><small>{{.Status}}</small></div><form method="post" action="/task-status"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{$project}}"><input type="hidden" name="task" value="{{.ID}}"><select name="status"><option value="pending">Pendiente</option><option value="in_progress">En progreso</option><option value="done">Completa</option></select><button>✓</button></form></div>{{else}}<p class="muted">No hay tareas.</p>{{end}}<form method="post" action="/task"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{.ID}}"><input name="title" maxlength="300" placeholder="Nueva tarea" required><button>Añadir tarea</button></form></div></div></article>
       {{else}}<div class="empty-projects card">◇ Aún no hay proyectos registrados. Crea el primero desde el formulario.</div>{{end}}
       </section>
+
+
+{{else if eq .Page "agents"}}
+<div class="route-heading"><span class="eyebrow">ORQUESTADOR · OPCIONAL</span><h2>Delegación entre chats</h2>
+ <p>Cada subagente recibe un MCP y una ruta exactos. No se abre otro chat ni se delega nada sin tu confirmación.</p>
+</div>
+<section class="card section-card agent-consent">
+ <div class="card-head"><div><span class="card-kicker">CONTROL HUMANO</span><h3>¿Quieres utilizar un subagente para esta tarea?</h3></div><span class="pill">Opcional</span></div>
+ <p>Si eliges No, no se crea ninguna tarea. Elegir Sí solo permite preparar una asignación; no inicia ejecución automática. Las rutas son límites de trabajo en el prompt, no permisos de sistema operativo.</p>
+ {{if not .AgentCurrent}}
+ <div class="agent-choice"><a href="/dashboard" class="action-link">No, volver al panel</a>
+ <details class="agent-setup"><summary class="agent-button">Sí, preparar delegación</summary>
+ <form method="post" action="/agent-create" class="agent-form">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <label>Título<input name="title" required maxlength="150" placeholder="Implementar API de auditoría"></label>
+  <label>Conector MCP de trabajo<input name="mcp" required maxlength="200" placeholder="$pl0 (nombre literal, ejemplo)"></label>
+  <label>ID de instancia MCP (opcional)<input name="mcp_id" maxlength="200" placeholder="app://... o identificador registrado"></label>
+  <label>Directorio absoluto del proyecto<input name="workspace" required maxlength="300" placeholder="/kaggle/working/proyecto"></label>
+  <label>Rama Git aislada<input name="branch" required maxlength="160" placeholder="agent/task-api-auditoria"></label>
+  <label class="wide">Objetivo<textarea name="objective" required maxlength="3500" rows="3" placeholder="Resultado preciso que debe construir el subagente"></textarea></label>
+  <label class="wide">Contexto mínimo<textarea name="context" required maxlength="3500" rows="3" placeholder="Arquitectura, decisiones y dependencias relevantes (sin secretos)"></textarea></label>
+  <label class="wide">Rutas permitidas (relativas al proyecto; separadas por espacios)<input name="allowed_paths" required placeholder="internal/api/ internal/db/"></label>
+  <label class="wide">Criterios de aceptación<textarea name="criteria" required maxlength="2500" rows="3" placeholder="Pruebas necesarias, contratos y comportamiento esperado"></textarea></label>
+  <label class="wide agent-check"><input type="checkbox" name="user_approved" value="yes" required><span>Confirmo que deseo delegar esta tarea concreta. He verificado el conector y la ruta; puedo revocar el trabajo deteniéndolo en el otro chat.</span></label>
+  <button type="submit" class="action-primary">Crear asignación y generar prompt →</button>
+ </form></details></div>
+ {{else}}
+  <div class="agent-prompt-ready"><strong>Asignación {{.AgentCurrent.ID}} creada</strong>
+   <p>Conecta el mismo MCP coordinador y el MCP de trabajo en el segundo chat. Comprueba manualmente la ruta antes de comenzar.</p>
+   <label for="agentPrompt">Prompt para el segundo chat</label>
+   <textarea id="agentPrompt" readonly rows="14">{{.AgentPrompt}}</textarea>
+   <button type="button" id="copyAgentPrompt" class="action-primary">Copiar prompt</button>
+  </div>
+ {{end}}
+</section>
+<section class="card section-card agent-board" aria-labelledby="agentBoardHeading">
+ <div class="card-head"><div><span class="card-kicker">SEGUIMIENTO</span><h3 id="agentBoardHeading">Tareas delegadas</h3></div><small>Guardadas en KagMCP</small></div>
+ {{range .AgentList}}
+ <article class="agent-task">
+  <div class="agent-task-top"><div><strong>{{.Title}}</strong><small>{{.ID}} · {{.MCP}} · {{.Workspace}}</small></div><span class="pill">{{.Status}}</span></div>
+  <p>{{.Objective}}</p><div class="agent-meta"><span>Rama: <code>{{.Branch}}</code></span><span>Agente: {{if .Agent}}{{.Agent}}{{else}}Sin asignar{{end}}</span></div>
+  {{if .Summary}}<p><strong>Entrega:</strong> {{.Summary}}</p>{{end}}
+  {{if .Tests}}<p><strong>Pruebas:</strong> {{.Tests}}</p>{{end}}
+  {{if .Commit}}<p><strong>Commit:</strong> <code>{{.Commit}}</code></p>{{end}}
+  {{if .Blocker}}<p><strong>Bloqueo:</strong> {{.Blocker}}</p>{{end}}
+  {{if .Review}}<p><strong>Revisión:</strong> {{.Review}}</p>{{end}}
+  <a class="agent-task-link" href="/agents?created={{.ID}}">Ver prompt / contexto</a>
+  {{if ne .Status "approved"}}{{if ne .Status "cancelled"}}
+  <details class="agent-cancel">
+   <summary>Cancelar asignación</summary>
+   <form action="/agent-cancel" method="post">
+    <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}">
+    <label>Motivo de cancelación<input name="note" maxlength="1000" placeholder="La tarea ya no se necesita" required></label>
+    <button type="submit">Confirmar cancelación</button>
+   </form>
+   <small>Cancelar en KagMCP impide nuevas entregas; no detiene automáticamente otro chat o comando en ejecución.</small>
+  </details>
+  {{end}}{{end}}
+  {{if eq .Status "needs_review"}}
+  <form action="/agent-review" method="post" class="agent-review-form">
+   <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}">
+   <label>Conclusión de revisión<textarea name="note" required maxlength="2500" placeholder="Revisé commit y pruebas; decisión motivada"></textarea></label>
+   <div class="agent-review-actions"><button type="submit" name="decision" value="approved" class="action-primary">Aprobar entrega</button><button type="submit" name="decision" value="rejected">Rechazar y devolver</button></div>
+  </form>{{end}}
+ </article>
+ {{else}}<p class="muted">Todavía no se ha delegado ninguna tarea. Es opcional.</p>{{end}}
+</section>
 
 {{else if eq .Page "activity"}}
 <div class="route-heading"><span class="eyebrow">AUDITORÍA</span><h2>Actividad reciente</h2></div><section class="card section-card history-card" id="history">

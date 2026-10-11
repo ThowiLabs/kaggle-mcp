@@ -207,6 +207,18 @@
     link.addEventListener("click", () => setDrawer(false)));
   media.addEventListener("change", syncSidebar);
   syncSidebar();
+  el("copyAgentPrompt")?.addEventListener("click",async () => {
+    const field=el("agentPrompt");
+    if(!field)return;
+    const button=el("copyAgentPrompt");
+    try {
+      await navigator.clipboard.writeText(field.value);
+      button.textContent="Prompt copiado";
+    } catch (_e) {
+      field.select();
+      button.textContent="Seleccionado · usa Ctrl+C";
+    }
+  });
   if (monitor) {
     refresh();
     setInterval(refresh,5000);
