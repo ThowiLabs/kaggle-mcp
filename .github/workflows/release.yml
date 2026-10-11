@@ -1,24 +1,27 @@
 name: Publicar KagMCP
 
-# Manual: valida y compila antes de crear un tag nuevo.
-# Tag v*: compila el commit etiquetado y publica su Release.
+# Ejecución manual: versión opcional; vacío = siguiente número X.Y.
+# También se publica al subir un tag numérico 1.0 o v1.0.
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Nueva versión: v1.2.3 o v1.2.3-rc.1"
-        required: true
+        description: "Opcional: 1.0, 2.5, beta-1... Vacío = 1.0, 1.1, 1.2..."
+        required: false
+        default: ""
         type: string
   push:
     tags:
       - "v*"
+      - "[0-9]*"
 
-# Ejecutar las pruebas sin un token que pueda publicar o modificar repositorios.
 permissions:
   contents: read
 
+# Evita que dos ejecuciones automáticas obtengan simultáneamente
+# el mismo número antes de crear sus tags.
 concurrency:
-  group: kagmcp-release-${{ inputs.version || github.ref_name }}
+  group: kagmcp-release-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
@@ -28,34 +31,28 @@ jobs:
     timeout-minutes: 20
     outputs:
       commit_sha: ${{ steps.commit.outputs.sha }}
+      tag: ${{ steps.version.outputs.tag }}
     env:
-      TAG: ${{ inputs.version || github.ref_name }}
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
     steps:
-      - name: Validar versión y rama
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
-            echo "::error::Versión inválida: usa v1.2.3 o v1.2.3-rc.1"
-            exit 1
-          fi
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-            if [[ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]]; then
-              echo "::error::Ejecuta publicaciones manuales desde la rama predeterminada ($DEFAULT_BRANCH)."
-              exit 1
-            fi
-          elif [[ "$GITHUB_REF" != "refs/tags/$TAG" ]]; then
-            echo "::error::La referencia del evento no coincide con el tag."
-            exit 1
-          fi
-          echo "Versión validada: $TAG"
-
-      - name: Checkout
+      - name: Checkout con tags existentes
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Resolver versión personalizada o automática
+        id: version
+        shell: bash
+        env:
+          MANUAL_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="$(python3 scripts/release_version.py "$GITHUB_EVENT_NAME" "$GITHUB_REF" "$DEFAULT_BRANCH" "$MANUAL_VERSION")"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Versión seleccionada: $TAG"
+          echo "### Versión seleccionada: $TAG" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Exigir tags nacidos de la rama predeterminada
         if: github.event_name == 'push'
@@ -78,8 +75,10 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Validar notebook Kaggle
-        run: python3 scripts/check_notebook.py
+      - name: Validar notebook Kaggle y lógica de versiones
+        run: |
+          python3 scripts/check_notebook.py
+          python3 -m unittest discover -s scripts -p 'test_release_version.py'
 
       - name: Pruebas y análisis estático
         shell: bash
@@ -133,7 +132,7 @@ jobs:
     permissions:
       contents: write
     env:
-      TAG: ${{ inputs.version || github.ref_name }}
+      TAG: ${{ needs.build.outputs.tag }}
       COMMIT_SHA: ${{ needs.build.outputs.commit_sha }}
       GH_TOKEN: ${{ github.token }}
     steps:

@@ -230,4 +230,4 @@ El MCP incluye tags (ligeros/anotados), Actions (workflow YAML, enable/disable, 
 
 ## Releases automatizadas
 
-El workflow [Publicar KagMCP](.github/workflows/release.yml) permite crear una Release con tag y distribuir dos binarios estáticos Linux (AMD64 y ARM64), sus paquetes ZIP y hashes SHA-256. Se puede iniciar desde GitHub Actions con una versión nueva como `v1.2.3`, o automáticamente al hacer push de un tag semántico. No se sobrescriben versiones publicadas. [Instrucciones completas](RELEASES.md).
+El workflow [Publicar KagMCP](.github/workflows/release.yml) permite crear una Release con tag y distribuir dos binarios estáticos Linux (AMD64 y ARM64), sus paquetes ZIP y hashes SHA-256. Se puede iniciar manualmente con una versión como `1.0` o `beta-1`, o dejando la versión vacía para autoincrementar (`1.0`, `1.1`, `1.2`...). También reacciona a tags numéricos o prefijados con `v` publicados en GitHub. No se sobrescriben versiones publicadas. [Instrucciones completas](RELEASES.md).
