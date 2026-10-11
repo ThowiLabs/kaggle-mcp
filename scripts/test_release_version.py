@@ -1,4 +1,6 @@
 """Tests for KagMCP Release auto-increment and manually chosen Git tags."""
+import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -100,6 +102,44 @@ class ReleaseVersionTests(unittest.TestCase):
                 cwd=folder, check=True, capture_output=True, text=True
             )
             self.assertEqual(manual.stdout.strip(), "3.5")
+
+
+class GitHubTagReferenceFilterTests(unittest.TestCase):
+    # The same jq filter is used by release.yml in the privileged publish job.
+    QUERY = (
+        'if type != "array" then error("Respuesta inválida de GitHub") '
+        'else .[] | select(.ref == $ref) end'
+    )
+
+    @unittest.skipUnless(shutil.which("jq"), "jq se prueba en ubuntu-latest")
+    def test_empty_and_prefix_refs_do_not_appear_to_exist(self):
+        for payload in (
+            [],
+            [{"ref": "refs/tags/1.10", "object": {"type": "commit", "sha": "a" * 40}}],
+        ):
+            with self.subTest(payload=payload):
+                result = subprocess.run(
+                    ["jq", "-c", "--arg", "ref", "refs/tags/1.1", self.QUERY],
+                    input=json.dumps(payload),
+                    capture_output=True, text=True, check=True,
+                )
+                self.assertEqual(result.stdout.strip(), "")
+
+    @unittest.skipUnless(shutil.which("jq"), "jq se prueba en ubuntu-latest")
+    def test_exact_ref_is_returned_and_error_object_rejected(self):
+        ref = {"ref": "refs/tags/1.1", "object": {"type": "commit", "sha": "b" * 40}}
+        result = subprocess.run(
+            ["jq", "-c", "--arg", "ref", "refs/tags/1.1", self.QUERY],
+            input=json.dumps([ref]),
+            capture_output=True, text=True, check=True,
+        )
+        self.assertEqual(json.loads(result.stdout), ref)
+        failed = subprocess.run(
+            ["jq", "-c", "--arg", "ref", "refs/tags/1.1", self.QUERY],
+            input=json.dumps({"message": "Not Found"}),
+            capture_output=True, text=True,
+        )
+        self.assertNotEqual(failed.returncode, 0)
 
 
 if __name__ == "__main__":

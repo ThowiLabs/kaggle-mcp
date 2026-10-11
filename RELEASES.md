@@ -44,6 +44,14 @@ Si bajas el ejecutable sin comprimir por HTTP a Linux, hazlo ejecutable antes de
 - El job de escritura no hace checkout ni ejecuta código del repo; solo consume los paquetes verificados.
 - Si el proceso se interrumpe tras crear el tag y antes de publicar la Release, vuelve a ejecutar manualmente la misma versión desde el mismo commit. Si ya existe una Release, se exige una versión nueva: se prefiere no sobrescribir publicaciones.
 
+## Error corregido: «El tag apunta a otro commit» sin tags
+
+En versiones anteriores, el paso de publicación hacía `gh api .../git/ref/tags/TAG --jq '.object.sha' 2>/dev/null || true`. Ante un tag inexistente GitHub devuelve **HTTP 404**, pero `gh api` puede escribir un cuerpo JSON de error en la salida estándar. El workflow interpretaba ese JSON no vacío como si fuera un SHA y mostraba un conflicto falso.
+
+Ahora consulta `GET /git/matching-refs/tags/TAG`: un tag inexistente devuelve `[]` y el workflow lo crea. Se compara además `refs/tags/TAG` **exactamente**, de modo que `1.1` no confunda el tag `1.10`; los tags anotados se desreferencian hasta su commit real. Los errores de red o permisos ya no se convierten silenciosamente en «tag inexistente».
+
+Verificado con consultas **de solo lectura** a `ThowiLabs/kagssh-go`: `git ls-remote --tags origin` no devuelve etiquetas, `gh release list` está vacío y `gh api .../git/matching-refs/tags/1.0` y `1.1` devolvieron `[]`. No se borró ni creó ningún tag al investigar.
+
 ## Validaciones realizadas localmente
 
 `actionlint` sobre el workflow, pruebas `scripts/test_release_version.py` (incluye `1.0`, `1.1`, `1.2`, `1.10` y versiones manuales), `go test ./...`, `go vet ./...` y cross-build Linux AMD64/ARM64 con `main.version` inyectada. No se disparó la Release real desde GitHub en esta tarea: hay que subir el commit y ejecutar el workflow una vez con una versión nueva.

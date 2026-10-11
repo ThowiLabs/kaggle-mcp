@@ -166,17 +166,40 @@ jobs:
           fi
 
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-            # Si una ejecución anterior creó el tag y falló durante la release,
-            # se permite recuperarla SOLO si apunta al mismo commit verificado.
-            existing=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq '.object.sha' 2>/dev/null || true)
-            if [[ -n "$existing" ]]; then
-              if [[ "$existing" != "$COMMIT_SHA" ]]; then
-                echo "::error::El tag $TAG apunta a otro commit: no se sobrescribirá."
-                exit 1
-              fi
-            else
+            # La API /git/ref/tags/X devuelve HTTP 404 cuando falta el tag.
+            # gh api puede imprimir el JSON de error por stdout incluso con --jq:
+            # NUNCA usar "2>/dev/null || true" para decidir si el tag existe.
+            # matching-refs devuelve [] con HTTP 200 cuando no hay coincidencias.
+            matches="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$TAG")"
+            # matching-refs también devuelve coincidencias por prefijo:
+            # comparar el nombre EXACTO (1.1 no debe confundir con 1.10).
+            exact_ref="$(jq -c --arg ref "refs/tags/$TAG" \
+              'if type != "array" then error("Respuesta inválida de GitHub") else .[] | select(.ref == $ref) end' \
+              <<< "$matches")"
+
+            if [[ -z "$exact_ref" ]]; then
+              echo "Tag $TAG no existe; creándolo sobre el commit verificado $COMMIT_SHA"
               gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
                 -f "ref=refs/tags/$TAG" -f "sha=$COMMIT_SHA" >/dev/null
+            else
+              existing="$(jq -er '.object.sha' <<< "$exact_ref")"
+              ref_type="$(jq -er '.object.type' <<< "$exact_ref")"
+              # Los tags anotados apuntan a un objeto TAG y no directamente
+              # a un commit; desreferenciarlo antes de comparar.
+              if [[ "$ref_type" == "tag" ]]; then
+                object="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$existing")"
+                ref_type="$(jq -er '.object.type' <<< "$object")"
+                existing="$(jq -er '.object.sha' <<< "$object")"
+              fi
+              if [[ "$ref_type" != "commit" ]]; then
+                echo "::error::El tag $TAG no apunta a un commit (tipo $ref_type)."
+                exit 1
+              fi
+              if [[ "$existing" != "$COMMIT_SHA" ]]; then
+                echo "::error::El tag $TAG ya existe y apunta a $existing, distinto del commit probado $COMMIT_SHA. Usa Version vacío para publicar la siguiente versión; no se sobrescribirán tags."
+                exit 1
+              fi
+              echo "Tag $TAG ya existe en el mismo commit verificado; retomando la Release."
             fi
           fi
 
