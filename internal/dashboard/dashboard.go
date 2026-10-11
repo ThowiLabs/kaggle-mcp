@@ -258,7 +258,7 @@ type view struct {
 	CSRF         string
 	Message      string
 	Projects     []projectstate.Project
-	History      []projectstate.Event
+	Activity     projectstate.HistoryPage
 	SkillList    []skills.Info
 	SkillContent string
 	SkillName    string
@@ -280,7 +280,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.login(w, r)
 		return
 	}
-	if r.URL.Path != "/" && r.URL.Path != "/dashboard" && r.URL.Path != "/resources" && r.URL.Path != "/projects" && r.URL.Path != "/activity" && r.URL.Path != "/integrations" && r.URL.Path != "/security" && r.URL.Path != "/skills" && r.URL.Path != "/project" && r.URL.Path != "/memory" && r.URL.Path != "/task" && r.URL.Path != "/task-status" && r.URL.Path != "/github" && r.URL.Path != "/huggingface" && r.URL.Path != "/api/metrics" && r.URL.Path != "/export" && r.URL.Path != "/import" && r.URL.Path != "/change-pin" && r.URL.Path != "/logout" {
+	if r.URL.Path != "/" && r.URL.Path != "/dashboard" && r.URL.Path != "/resources" && r.URL.Path != "/projects" && r.URL.Path != "/activity" && r.URL.Path != "/integrations" && r.URL.Path != "/security" && r.URL.Path != "/skills" && r.URL.Path != "/project" && r.URL.Path != "/memory" && r.URL.Path != "/task" && r.URL.Path != "/task-status" && r.URL.Path != "/github" && r.URL.Path != "/huggingface" && r.URL.Path != "/api/metrics" && r.URL.Path != "/api/activity" && r.URL.Path != "/export" && r.URL.Path != "/import" && r.URL.Path != "/change-pin" && r.URL.Path != "/logout" {
 		http.NotFound(w, r)
 		return
 	}
@@ -296,20 +296,44 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.metrics(w, r)
 		return
 	}
+	if r.URL.Path == "/api/activity" {
+		if r.Method != http.MethodGet {
+			http.Error(w, "método no permitido", http.StatusMethodNotAllowed)
+			return
+		}
+		page, err := activityPageNumber(r)
+		if err != nil {
+			http.Error(w, "página inválida", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		_ = json.NewEncoder(w).Encode(h.Projects.HistoryPage(page))
+		return
+	}
 	if r.Method == http.MethodGet {
 		if !isPage(r.URL.Path) {
 			http.NotFound(w, r)
 			return
 		}
-		state := h.Projects.Snapshot()
+		page, err := activityPageNumber(r)
+		if r.URL.Path == "/activity" && err != nil {
+			http.Error(w, "página inválida", http.StatusBadRequest)
+			return
+		}
 		pageName := r.URL.Path
 		if pageName == "/" {
 			pageName = "/dashboard"
 		}
 		meta := pageDescriptions[pageName]
-		v := view{CSRF: sess.CSRF, Page: strings.TrimPrefix(pageName, "/"), PageTitle: meta[0], PageSubtitle: meta[1], Projects: state.Projects, History: state.History, GitHubOn: h.GitHubConfigured(), HFOn: h.HFConfigured != nil && h.HFConfigured()}
-		v.SkillList, _ = h.Skills.List()
-		if r.URL.Path == "/skills" {
+		v := view{CSRF: sess.CSRF, Page: strings.TrimPrefix(pageName, "/"), PageTitle: meta[0], PageSubtitle: meta[1], GitHubOn: h.GitHubConfigured(), HFOn: h.HFConfigured != nil && h.HFConfigured()}
+		if pageName == "/dashboard" || pageName == "/projects" {
+			v.Projects = h.Projects.Snapshot().Projects
+		}
+		if pageName == "/activity" {
+			v.Activity = h.Projects.HistoryPage(page)
+		}
+		if pageName == "/skills" {
+			v.SkillList, _ = h.Skills.List()
 			name := r.URL.Query().Get("name")
 			if name == "" {
 				name = skills.Active
@@ -426,6 +450,23 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
+
+// Shared validation for SSR links and the live JSON API.
+// A page number of zero, negative or too large is not silently accepted.
+func activityPageNumber(r *http.Request) (int, error) {
+	raw := r.URL.Query().Get("page")
+	if raw == "" {
+		return 1, nil
+	}
+	if len(raw) > 9 {
+		return 0, errors.New("página inválida")
+	}
+	page, err := strconv.Atoi(raw)
+	if err != nil || page < 1 {
+		return 0, errors.New("página inválida")
+	}
+	return page, nil
+}
 func (h *Handler) page(w http.ResponseWriter, v view) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = pageTemplate.Execute(w, v)
@@ -446,7 +487,7 @@ func (h *Handler) serveAsset(w http.ResponseWriter, r *http.Request) {
 	switch name {
 	case "axolotl.css", "dashboard.css":
 		kind = "text/css; charset=utf-8"
-	case "dashboard.js":
+	case "dashboard.js", "activity.js":
 		kind = "application/javascript; charset=utf-8"
 	case "axolotl.svg":
 		kind = "image/svg+xml"

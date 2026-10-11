@@ -145,3 +145,61 @@ background:conic-gradient(from 0deg,#bc8cfa 0 var(--gpu-fill),#3b293c var(--gpu-
 .live-indicator .status-dot,.sidebar-bottom .status-dot,.server-metrics .server-status:before{background:#826878;box-shadow:none}
 .live-indicator.is-live,.server-metrics .server-status.is-live{color:#8edbc7}
 .live-indicator.is-live .status-dot,.sidebar-bottom.is-live .status-dot,.server-metrics .server-status.is-live:before{background:#8edbc7;box-shadow:0 0 0 4px rgba(142,219,199,.1)}
+
+/* Axolotl compact sidebar: preserve our <span class="nav-icon"> icons.
+   The original theme hides ALL nav spans on collapse (it expected <i>). */
+.app.sidebar-collapsed .sidebar { overflow-x:hidden; }
+.app.sidebar-collapsed .sidebar-top { flex-direction:column; justify-content:center; gap:9px; padding:2px 0 12px; }
+.app.sidebar-collapsed .brand { width:100%;justify-content:center; }
+.app.sidebar-collapsed .brand > span { display:none; }
+.app.sidebar-collapsed .brand img { width:37px;height:37px;flex:none; }
+.app.sidebar-collapsed #collapseBtn { width:34px;height:31px;min-width:34px;flex:none; }
+.app.sidebar-collapsed .nav-label { display:none; }
+.app.sidebar-collapsed .nav { gap:9px; }
+.app.sidebar-collapsed .nav-item { width:100%;min-height:44px;padding:0;justify-content:center;gap:0; }
+.app.sidebar-collapsed .nav-item > .nav-icon { display:inline-grid!important;place-items:center;width:31px;min-width:31px;height:31px;margin:0;flex:none;font-size:19px; }
+.app.sidebar-collapsed .nav-item > span:not(.nav-icon) { display:none; }
+.app.sidebar-collapsed .sidebar-bottom { justify-content:center;min-width:0;padding:9px; }
+.app.sidebar-collapsed .sidebar-bottom > div { display:none; }
+.nav-item { min-width:0; }
+.nav-icon { flex:0 0 28px;display:inline-grid;place-items:center; }
+.app .sidebar-top, .app .nav-item, .app .sidebar-bottom { box-sizing:border-box; }
+@media(max-width:850px) {
+  .app.sidebar-collapsed .sidebar-top {flex-direction:row;justify-content:space-between;padding:0}
+  .app.sidebar-collapsed .brand > span {display:block}
+  .app.sidebar-collapsed .nav-label {display:block}
+  .app.sidebar-collapsed .nav-item {justify-content:flex-start;padding:0 10px;gap:9px}
+  .app.sidebar-collapsed .nav-item > span:not(.nav-icon) {display:inline}
+  .app.sidebar-collapsed .sidebar-bottom > div {display:block}
+  .app .sidebar {z-index:120;overflow-x:hidden}
+  .app .mobile-sidebar-backdrop {z-index:110}
+}
+/* Compact, accessible activity timeline and pagination. */
+.history-card .card-head {align-items:center}
+.activity-summary {display:flex;align-items:center;justify-content:space-between;gap:14px;margin:17px 0 8px;color:#b995a8;font-size:12px;flex-wrap:wrap}
+.activity-summary strong {color:#fee1eb}
+.activity-entries {min-width:0}
+.history-entry {min-width:0}
+.history-details {min-width:0;flex:1}
+.history-details pre {max-height:155px;white-space:pre-wrap;overflow-wrap:anywhere}
+.activity-live {display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;border:1px solid #503342;color:#c1a0b1;background:#2a1d29;font-size:11px;white-space:nowrap}
+.activity-live::before {content:"";width:7px;height:7px;flex:none;border-radius:50%;background:#927889}
+.activity-live.is-live {color:#a2edda;border-color:#2c655b}
+.activity-live.is-live::before {background:#8edbc7;box-shadow:0 0 7px #8edbc777}
+.activity-pagination {display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:8px;margin-top:19px}
+.activity-page {min-width:38px;min-height:38px;padding:9px 13px;display:inline-grid;place-items:center;border:1px solid #58394b;border-radius:9px;background:#221721;color:#f2d3e0;text-decoration:none;font-size:12px;font-weight:700}
+.activity-page:hover {background:#3c2635;border-color:#c07699}
+.activity-page.current {background:#9b446d;color:white;border-color:#e477a1}
+.activity-page:focus-visible {outline:2px solid #ffa7c4;outline-offset:2px}
+.activity-gap {padding:6px;color:#b394a7}
+.activity-page-info {margin:11px 0 0;text-align:center;font-size:11px;color:#b190a1}
+@media(max-width:520px) {
+  .history-entry {flex-direction:column;gap:5px}
+  .activity-page {padding:8px 10px;min-width:35px}
+}
+
+/* Same top-right control closes the drawer on mobile. */
+@media(max-width:850px) {
+  .app #collapseBtn.hide-mobile {display:grid;width:34px;height:34px;flex:none;font-size:24px}
+  .app .sidebar-top {justify-content:space-between;align-items:center}
+}

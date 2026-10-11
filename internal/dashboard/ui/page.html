@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="/assets/axolotl.css">
 <link rel="stylesheet" href="/assets/dashboard.css">
 <script src="/assets/dashboard.js" defer></script>
+{{if eq .Page "activity"}}<script src="/assets/activity.js" defer></script>{{end}}
 </head>
 <body>
 {{if .Login}}
@@ -28,29 +29,29 @@
 </main>
 {{else}}
 <div class="app" id="app">
-  <div class="mobile-sidebar-backdrop" id="mobileBackdrop"></div>
-  <aside class="sidebar" id="sidebar">
+  <div class="mobile-sidebar-backdrop" id="mobileBackdrop" aria-hidden="true"></div>
+  <aside class="sidebar" id="sidebar" aria-label="Navegación principal">
     <div class="sidebar-top">
       <a class="brand" href="/" aria-label="KagMCP inicio"><img src="/assets/axolotl.svg" alt=""><span>Kag<span class="brand-accent">MCP</span><small>CONTROL CENTER</small></span></a>
-      <button type="button" id="collapseBtn" class="icon-button hide-mobile" aria-label="Contraer menú">«</button>
+      <button type="button" id="collapseBtn" class="icon-button hide-mobile" aria-label="Contraer menú" aria-expanded="true" aria-controls="sidebar" title="Contraer menú">«</button>
     </div>
     <nav class="nav" aria-label="Navegación">
       <div class="nav-label">OPERACIÓN</div>
-      <a class="nav-item {{if eq .Page "dashboard"}}active{{end}}" href="/dashboard"><span class="nav-icon">▦</span><span>Dashboard</span></a>
-      <a class="nav-item {{if eq .Page "resources"}}active{{end}}" href="/resources"><span class="nav-icon">◉</span><span>Recursos Kaggle</span></a>
-      <a class="nav-item {{if eq .Page "projects"}}active{{end}}" href="/projects"><span class="nav-icon">▤</span><span>Proyectos</span></a>
-      <a class="nav-item {{if eq .Page "activity"}}active{{end}}" href="/activity"><span class="nav-icon">◷</span><span>Actividad</span></a>
+      <a class="nav-item {{if eq .Page "dashboard"}}active{{end}}" href="/dashboard" aria-label="Dashboard" title="Dashboard"><span class="nav-icon">▦</span><span>Dashboard</span></a>
+      <a class="nav-item {{if eq .Page "resources"}}active{{end}}" href="/resources" aria-label="Recursos Kaggle" title="Recursos Kaggle"><span class="nav-icon">◉</span><span>Recursos Kaggle</span></a>
+      <a class="nav-item {{if eq .Page "projects"}}active{{end}}" href="/projects" aria-label="Proyectos" title="Proyectos"><span class="nav-icon">▤</span><span>Proyectos</span></a>
+      <a class="nav-item {{if eq .Page "activity"}}active{{end}}" href="/activity" aria-label="Actividad" title="Actividad"><span class="nav-icon">◷</span><span>Actividad</span></a>
       <div class="nav-label">SISTEMA</div>
-      <a class="nav-item {{if eq .Page "integrations"}}active{{end}}" href="/integrations"><span class="nav-icon">⚙</span><span>Integraciones</span></a>
-      <a class="nav-item {{if eq .Page "skills"}}active{{end}}" href="/skills"><span class="nav-icon">◇</span><span>Skills</span></a>
-      <a class="nav-item {{if eq .Page "security"}}active{{end}}" href="/security"><span class="nav-icon">♙</span><span>Seguridad</span></a>
+      <a class="nav-item {{if eq .Page "integrations"}}active{{end}}" href="/integrations" aria-label="Integraciones" title="Integraciones"><span class="nav-icon">⚙</span><span>Integraciones</span></a>
+      <a class="nav-item {{if eq .Page "skills"}}active{{end}}" href="/skills" aria-label="Skills" title="Skills"><span class="nav-icon">◇</span><span>Skills</span></a>
+      <a class="nav-item {{if eq .Page "security"}}active{{end}}" href="/security" aria-label="Seguridad" title="Seguridad"><span class="nav-icon">♙</span><span>Seguridad</span></a>
     </nav>
     <div class="sidebar-bottom"><span class="status-dot"></span><div><strong>Kaggle runtime</strong><small id="connectionStatus">Esperando telemetría…</small></div></div>
   </aside>
   <main class="main">
     <header class="topbar">
       <div class="welcome">
-        <button type="button" id="menuBtn" class="icon-button mobile-menu" aria-label="Abrir navegación">☰</button>
+        <button type="button" id="menuBtn" class="icon-button mobile-menu" aria-label="Abrir navegación" aria-expanded="false" aria-controls="sidebar">☰</button>
         <div><h1>{{.PageTitle}}</h1><p>{{.PageSubtitle}}</p></div>
       </div>
       <div class="top-actions">
@@ -185,7 +186,36 @@
       </section>
 
 {{else if eq .Page "activity"}}
-<div class="route-heading"><span class="eyebrow">AUDITORÍA</span><h2>Actividad reciente</h2></div><section class="card section-card history-card" id="history"><div class="card-head"><div><span class="card-kicker">AUDITORÍA</span><h3>Historial de comandos</h3></div></div><p>Registro compartido de las operaciones. Evita incluir credenciales en comandos.</p>{{range .History}}<div class="history-entry"><span class="pill">{{.Status}}</span><div><strong>{{.Description}}</strong><small>{{.When.Format "2006-01-02 15:04:05"}} · {{.Project}}</small><pre>{{.Command}}</pre></div></div>{{else}}<p class="muted">Sin actividad registrada.</p>{{end}}</section>
+<div class="route-heading"><span class="eyebrow">AUDITORÍA</span><h2>Actividad reciente</h2></div><section class="card section-card history-card" id="history">
+  <div class="card-head">
+    <div><span class="card-kicker">AUDITORÍA</span><h3>Historial de comandos</h3></div>
+    <span class="activity-live" id="activityLiveStatus" role="status" aria-live="polite">Sincronizando…</span>
+  </div>
+  <p>Se actualiza automáticamente cada 5 segundos. Página 1 = registros más recientes. Se conservan hasta 1,000 eventos.</p>
+  <div class="activity-summary">
+    <strong id="activityTotal">{{.Activity.Total}} registros</strong>
+    <span id="activityChecked">Última consulta al abrir la página</span>
+  </div>
+  <div id="activityEntries" class="activity-entries" aria-label="Eventos auditados">
+  {{range .Activity.Items}}
+    <article class="history-entry">
+      <span class="pill">{{.Status}}</span>
+      <div><strong>{{.Description}}</strong>
+        <small><time datetime="{{.When.Format "2006-01-02T15:04:05Z07:00"}}">{{.When.Format "2006-01-02 15:04:05"}} UTC</time> · {{.Project}}</small>
+        {{if .Command}}<pre>{{.Command}}</pre>{{end}}
+      </div>
+    </article>
+  {{else}}<p class="muted activity-empty">Todavía no hay eventos registrados.</p>{{end}}
+  </div>
+  <nav class="activity-pagination" id="activityPagination" aria-label="Páginas de actividad">
+    {{if .Activity.HasPrev}}<a class="activity-page" href="/activity?page={{.Activity.PrevPage}}" rel="prev">← Anterior</a>{{end}}
+    {{range .Activity.PageNumbers}}
+      <a class="activity-page {{if eq . $.Activity.Page}}current{{end}}" href="/activity?page={{.}}" {{if eq . $.Activity.Page}}aria-current="page"{{end}}>{{.}}</a>
+    {{end}}
+    {{if .Activity.HasNext}}<a class="activity-page" href="/activity?page={{.Activity.NextPage}}" rel="next">Siguiente →</a>{{end}}
+  </nav>
+  <p class="activity-page-info" id="activityPageInfo">Página {{.Activity.Page}} de {{.Activity.TotalPages}} · Orden: más reciente primero</p>
+</section>
 
 {{else if eq .Page "skills"}}
 <div class="route-heading"><span class="eyebrow">AGENTES</span><h2>Skills disponibles</h2></div><section class="standalone-section">

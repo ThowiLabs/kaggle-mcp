@@ -160,9 +160,59 @@
       donut(null);
     }finally{busy=false}
   }
-  el("collapseBtn")?.addEventListener("click",()=>root.classList.toggle("sidebar-collapsed"));
-  el("menuBtn")?.addEventListener("click",()=>root.classList.add("mobile-open"));
-  el("mobileBackdrop")?.addEventListener("click",()=>root.classList.remove("mobile-open"));
-  document.querySelectorAll(".sidebar .nav-item").forEach(a=>a.addEventListener("click",()=>root.classList.remove("mobile-open")));
-  if(monitor){refresh();setInterval(refresh,5000);document.addEventListener("visibilitychange",()=>{if(!document.hidden)refresh()})}
+  // The Axolotl original uses <i> for icons; our nav uses <span>.
+  // Persist the collapsed preference and keep mobile drawer state separate.
+  const media = window.matchMedia("(max-width: 850px)");
+  const sidebar = el("sidebar");
+  const collapseBtn = el("collapseBtn");
+  const menuBtn = el("menuBtn");
+  const storageKey = "kagmcp.sidebar.collapsed";
+  let collapsed = false;
+  try { collapsed = window.localStorage.getItem(storageKey) === "1"; } catch (_e) { /* private mode */ }
+  function setDrawer(open) {
+    root.classList.toggle("mobile-open", media.matches && open);
+    menuBtn?.setAttribute("aria-expanded", String(media.matches && open));
+    if (sidebar) {
+      sidebar.inert = media.matches && !open;
+      sidebar.setAttribute("aria-hidden", String(media.matches && !open));
+    }
+  }
+  function syncSidebar() {
+    root.classList.toggle("sidebar-collapsed", !media.matches && collapsed);
+    collapseBtn?.setAttribute("aria-expanded", String(!media.matches && !collapsed));
+    collapseBtn?.setAttribute("aria-label", media.matches ? "Cerrar navegación" : collapsed ? "Expandir menú" : "Contraer menú");
+    collapseBtn?.setAttribute("title", media.matches ? "Cerrar navegación" : collapsed ? "Expandir menú" : "Contraer menú");
+    if (collapseBtn) collapseBtn.textContent = media.matches ? "×" : collapsed ? "»" : "«";
+    setDrawer(false);
+  }
+  collapseBtn?.addEventListener("click", () => {
+    if (media.matches) {
+      setDrawer(false);
+      menuBtn?.focus();
+      return;
+    }
+    collapsed = !collapsed;
+    try { window.localStorage.setItem(storageKey, collapsed ? "1" : "0"); } catch (_e) {}
+    syncSidebar();
+  });
+  menuBtn?.addEventListener("click", () => setDrawer(true));
+  el("mobileBackdrop")?.addEventListener("click", () => { setDrawer(false); menuBtn?.focus(); });
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && root.classList.contains("mobile-open")) {
+      setDrawer(false);
+      menuBtn?.focus();
+    }
+  });
+  document.querySelectorAll(".sidebar .nav-item").forEach(link =>
+    link.addEventListener("click", () => setDrawer(false)));
+  media.addEventListener("change", syncSidebar);
+  syncSidebar();
+  if (monitor) {
+    refresh();
+    setInterval(refresh,5000);
+    document.addEventListener("visibilitychange",()=>{if(!document.hidden)refresh()});
+  } else if (!el("activityEntries")) {
+    put("liveLabel","PANEL ABIERTO");
+    put("connectionStatus","Métricas disponibles en Recursos");
+  }
 })();
