@@ -1,0 +1,202 @@
+name: Publicar KagMCP
+
+# Manual: valida y compila antes de crear un tag nuevo.
+# Tag v*: compila el commit etiquetado y publica su Release.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Nueva versión: v1.2.3 o v1.2.3-rc.1"
+        required: true
+        type: string
+  push:
+    tags:
+      - "v*"
+
+# Ejecutar las pruebas sin un token que pueda publicar o modificar repositorios.
+permissions:
+  contents: read
+
+concurrency:
+  group: kagmcp-release-${{ inputs.version || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Verificar y compilar Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      commit_sha: ${{ steps.commit.outputs.sha }}
+    env:
+      TAG: ${{ inputs.version || github.ref_name }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+    steps:
+      - name: Validar versión y rama
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo "::error::Versión inválida: usa v1.2.3 o v1.2.3-rc.1"
+            exit 1
+          fi
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]]; then
+              echo "::error::Ejecuta publicaciones manuales desde la rama predeterminada ($DEFAULT_BRANCH)."
+              exit 1
+            fi
+          elif [[ "$GITHUB_REF" != "refs/tags/$TAG" ]]; then
+            echo "::error::La referencia del evento no coincide con el tag."
+            exit 1
+          fi
+          echo "Versión validada: $TAG"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Exigir tags nacidos de la rama predeterminada
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git merge-base --is-ancestor HEAD "refs/remotes/origin/$DEFAULT_BRANCH"; then
+            echo "::error::El tag no pertenece al historial de la rama predeterminada."
+            exit 1
+          fi
+
+      - name: Registrar commit verificado
+        id: commit
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Configurar Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Validar notebook Kaggle
+        run: python3 scripts/check_notebook.py
+
+      - name: Pruebas y análisis estático
+        shell: bash
+        run: |
+          set -euo pipefail
+          go version
+          go test -timeout 120s ./...
+          go vet ./...
+
+      - name: Compilar y empaquetar Linux AMD64 y ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            binary="kagmcp-${TAG}-linux-${arch}"
+            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" \
+              go build -buildvcs=false -trimpath \
+              -ldflags="-s -w -X main.version=$TAG" \
+              -o "dist/$binary" ./cmd/kagssh
+            chmod 755 "dist/$binary"
+            file "dist/$binary"
+            if readelf -l "dist/$binary" | grep -q INTERP; then
+              echo "::error::El binario $arch es dinámico; se esperaba estático."
+              exit 1
+            fi
+            zip -j "dist/${binary}.zip" "dist/$binary" README.md USO_Y_CONFIGURACION.md
+            unzip -t "dist/${binary}.zip"
+          done
+          ./dist/kagmcp-${TAG}-linux-amd64 -version | grep -Fx "kagmcp $TAG"
+          (
+            cd dist
+            sha256sum kagmcp-* > SHA256SUMS.txt
+            sha256sum -c SHA256SUMS.txt
+          )
+
+      - name: Transferir artefactos verificados al job de publicación
+        uses: actions/upload-artifact@v4
+        with:
+          name: kagmcp-release-bundles
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  publish:
+    name: Crear tag y GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ inputs.version || github.ref_name }}
+      COMMIT_SHA: ${{ needs.build.outputs.commit_sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Recuperar archivos compilados
+        uses: actions/download-artifact@v4
+        with:
+          name: kagmcp-release-bundles
+          path: dist
+
+      - name: Verificar sumas y paquetes
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$COMMIT_SHA" =~ ^[[:xdigit:]]{40}$ ]] || { echo "::error::SHA inválido"; exit 1; }
+          (
+            cd dist
+            sha256sum -c SHA256SUMS.txt
+            test "$(find . -maxdepth 1 -name '*.zip' -type f | wc -l)" -eq 2
+            test "$(find . -maxdepth 1 -name 'kagmcp-*-linux-*' -type f ! -name '*.zip' | wc -l)" -eq 2
+          )
+
+      - name: Crear tag sin sobrescribir versiones y publicar Release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # No alterar una Release existente ni sus assets.
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::La Release $TAG ya existe. Utiliza una nueva versión."
+            exit 1
+          fi
+
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            # Si una ejecución anterior creó el tag y falló durante la release,
+            # se permite recuperarla SOLO si apunta al mismo commit verificado.
+            existing=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq '.object.sha' 2>/dev/null || true)
+            if [[ -n "$existing" ]]; then
+              if [[ "$existing" != "$COMMIT_SHA" ]]; then
+                echo "::error::El tag $TAG apunta a otro commit: no se sobrescribirá."
+                exit 1
+              fi
+            else
+              gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+                -f "ref=refs/tags/$TAG" -f "sha=$COMMIT_SHA" >/dev/null
+            fi
+          fi
+
+          flags=(--verify-tag --generate-notes --title "KagMCP $TAG")
+          if [[ "$TAG" == *-* ]]; then
+            flags+=(--prerelease)
+          fi
+          # GitHub CLI crea un borrador, sube los assets y luego publica.
+          gh release create "$TAG" dist/* "${flags[@]}" --repo "$GITHUB_REPOSITORY"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY"
+
+      - name: Resumen con enlace directo
+        if: success()
+        shell: bash
+        run: |
+          {
+            echo "### Publicado: $TAG"
+            echo ""
+            echo "Incluye los binarios Linux AMD64 y ARM64, sus ZIP y SHA256SUMS.txt."
+            echo ""
+            echo "https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
+          } >> "$GITHUB_STEP_SUMMARY"

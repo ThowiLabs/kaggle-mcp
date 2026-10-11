@@ -227,3 +227,7 @@ KagMCP incorpora la página **/agents** y herramientas MCP de delegación para c
 ## GitHub avanzado desde ChatGPT
 
 El MCP incluye tags (ligeros/anotados), Actions (workflow YAML, enable/disable, dispatch, runs, rerun y cancelación), subidas binarias de archivos locales a repositorios y adjuntos de Releases, además de `github_api` / `github_graphql`. Se requiere GITHUB_TOKEN autorizado y confirmación para acciones con efectos remotos. Consulta [GITHUB_CAPACIDADES.md](GITHUB_CAPACIDADES.md) para los permisos del PAT, ejemplos y límites de tamaño.
+
+## Releases automatizadas
+
+El workflow [Publicar KagMCP](.github/workflows/release.yml) permite crear una Release con tag y distribuir dos binarios estáticos Linux (AMD64 y ARM64), sus paquetes ZIP y hashes SHA-256. Se puede iniciar desde GitHub Actions con una versión nueva como `v1.2.3`, o automáticamente al hacer push de un tag semántico. No se sobrescriben versiones publicadas. [Instrucciones completas](RELEASES.md).
