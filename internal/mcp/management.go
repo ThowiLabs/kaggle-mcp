@@ -31,9 +31,13 @@ func (s *Server) configureGitHub(ctx context.Context, token string) (string, err
 	if token == "" {
 		s.githubMu.Lock()
 		s.github = githubtoken.New("")
+		if err := os.Unsetenv("GITHUB_TOKEN"); err != nil {
+			s.githubMu.Unlock()
+			return "", err
+		}
 		s.githubOn = false
 		s.githubMu.Unlock()
-		return "PAT desactivado para herramientas; reinicia el proceso y limpia el entorno para retirar la credencial de toda la sesión", nil
+		return "PAT desactivado para herramientas y procesos nuevos", nil
 	}
 	if strings.ContainsAny(token, "\x00\r\n\t ") {
 		return "", errors.New("formato de PAT inválido")
@@ -44,6 +48,10 @@ func (s *Server) configureGitHub(ctx context.Context, token string) (string, err
 		return "", fmt.Errorf("PAT no verificado: %w", err)
 	}
 	s.githubMu.Lock()
+	if err := os.Setenv("GITHUB_TOKEN", token); err != nil {
+		s.githubMu.Unlock()
+		return "", err
+	}
 	s.github = candidate
 	s.githubOn = true
 	s.githubMu.Unlock()

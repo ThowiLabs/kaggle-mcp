@@ -62,6 +62,8 @@ type Server struct {
 	githubMu     sync.RWMutex
 	github       *githubtoken.Client
 	githubOn     bool
+	hfMu         sync.RWMutex
+	hfToken      string
 	projects     *projectstate.Store
 	skills       skills.Registry
 }
@@ -98,13 +100,29 @@ func New(cfg config.Config, public string) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cargar proyectos: %w", err)
 	}
-	return &Server{cfg: cfg, public: public, auth: auth, pinState: pinState, generatedPIN: generated, github: githubtoken.New(cfg.GitHubToken), githubOn: cfg.GitHubToken != "", projects: projects, skills: skills.Registry{Dir: filepath.Join(cfg.DataDir, "skills")}}, nil
+
+	// Los Kaggle Secrets también estarán disponibles para comandos del runtime.
+	if cfg.GitHubToken != "" {
+		if err := os.Setenv("GITHUB_TOKEN", cfg.GitHubToken); err != nil {
+			return nil, err
+		}
+	}
+	if cfg.HFToken != "" {
+		if err := os.Setenv("HF_TOKEN", cfg.HFToken); err != nil {
+			return nil, err
+		}
+	}
+	return &Server{cfg: cfg, public: public, auth: auth, pinState: pinState, generatedPIN: generated, github: githubtoken.New(cfg.GitHubToken), githubOn: cfg.GitHubToken != "", hfToken: cfg.HFToken, projects: projects, skills: skills.Registry{Dir: filepath.Join(cfg.DataDir, "skills")}}, nil
 }
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	s.auth.RegisterRoutes(mux)
 	mux.Handle("/mcp", s)
-	mux.Handle("/", dashboard.New(s.public, s.pinState, s.auth.ResetOwner, s.projects, s.skills, s.configureGitHub, s.githubConfigured, s.projectExport, s.projectImport))
+
+	panel := dashboard.New(s.public, s.pinState, s.auth.ResetOwner, s.projects, s.skills, s.configureGitHub, s.githubConfigured, s.projectExport, s.projectImport)
+	panel.HuggingFace = s.configureHF
+	panel.HFConfigured = s.hfConfigured
+	mux.Handle("/", panel)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = io.WriteString(w, "KagMCP OK\n")
@@ -415,7 +433,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.rpc(w, resp)
 }
 
-const mcpInstructions = skills.Summary + " Ejecuta skills_read(ponytail-v2) al iniciar trabajo. En Kaggle cada prueba termina con repositorio Git y notebook funcional; después de verificarlos, una UI Gradio. Fija versiones, vigila espacio libre para evitar readonly, registra descripción/proyecto de comandos, memoria y tareas. Los datos de /kaggle/input solo lectura. No reveles secretos."
+const mcpInstructions = skills.Summary + " Ejecuta skills_read(ponytail-v2) al iniciar trabajo. PRIORIDAD GITHUB: para consultar o modificar contenido remoto en GitHub utiliza PRIMERO las herramientas github_* de este MCP (github_status, github_repositories, github_file_read/write, github_api, github_graphql, etc.) cuando estén disponibles y autorizadas; evita exec/git manual para operaciones remotas ya cubiertas. No realices operaciones destructivas sin autorización explícita. Si GITHUB_TOKEN falta, solicita configurarlo en el panel, no inventes acceso. Para proyectos locales Kaggle usa herramientas locales autorizadas. En Kaggle cada prueba termina con repositorio Git y notebook funcional; después de verificarlos, una UI Gradio. Fija versiones, vigila espacio libre para evitar readonly, registra descripción/proyecto de comandos, memoria y tareas. Los datos de /kaggle/input solo lectura. No reveles secretos."
 
 func (s *Server) rpc(w http.ResponseWriter, v response) {
 	s.rpcStatus(w, http.StatusOK, v)
@@ -528,7 +546,7 @@ func (s *Server) invoke(ctx context.Context, name string, raw json.RawMessage) (
 	switch name {
 	case "environment_info":
 		hostname, _ := os.Hostname()
-		return map[string]any{"platform": "kaggle", "hostname": hostname, "working": "/kaggle/working", "datasets": "/kaggle/input", "mcp_url": s.public + "/mcp", "github_configured": s.githubConfigured(), "ssh_enabled": s.cfg.SSHEnabled, "always_active_skill": skills.Active, "project_count": len(s.projects.Snapshot().Projects), "web_ui": s.public + "/"}, nil
+		return map[string]any{"platform": "kaggle", "hostname": hostname, "working": "/kaggle/working", "datasets": "/kaggle/input", "mcp_url": s.public + "/mcp", "github_configured": s.githubConfigured(), "huggingface_configured": s.hfConfigured(), "ssh_enabled": s.cfg.SSHEnabled, "always_active_skill": skills.Active, "project_count": len(s.projects.Snapshot().Projects), "web_ui": s.public + "/"}, nil
 	case "list_dir":
 		return s.listDir(a.Path)
 	case "read_file":
@@ -696,7 +714,7 @@ func (s *Server) exec(ctx context.Context, command, cwd string) (any, error) {
 	cmd := exec.CommandContext(taskCtx, shell, "-lc", command)
 	cmd.Dir = dir
 	for _, line := range os.Environ() {
-		if strings.HasPrefix(line, "GITHUB_") || strings.HasPrefix(line, "MCP_") || strings.HasPrefix(line, "KAGGLE_") || strings.HasPrefix(line, "SSH_") {
+		if strings.HasPrefix(line, "GITHUB_") || strings.HasPrefix(line, "MCP_") || strings.HasPrefix(line, "KAGGLE_") || strings.HasPrefix(line, "SSH_") || strings.HasPrefix(line, "HF_TOKEN=") {
 			continue
 		}
 		cmd.Env = append(cmd.Env, line)

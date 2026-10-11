@@ -21,7 +21,7 @@ var names = []string{
 	"SSH_LOGIN_USER", "SSH_LOGIN_PASSWORD",
 	"SSH_AUTHORIZED_KEYS", "SSH_HOST_KEY",
 	"MCP_ENABLED", "MCP_TUNNEL", "MCP_GRADIO_RETRIES", "MCP_PUBLIC_URL", "MCP_LISTEN_PORT", "MCP_ACCESS_PIN",
-	"SSH_ENABLED", "GITHUB_TOKEN",
+	"SSH_ENABLED", "GITHUB_TOKEN", "HF_TOKEN",
 }
 
 type Config struct {
@@ -31,7 +31,7 @@ type Config struct {
 	Retry                                                                time.Duration
 	SSHEnabled, MCPEnabled                                               bool
 	MCPPort, MCPGradioRetries                                            int
-	MCPTunnel, MCPPublicURL, MCPAccessPIN, GitHubToken, DataDir          string
+	MCPTunnel, MCPPublicURL, MCPAccessPIN, GitHubToken, HFToken, DataDir string
 }
 
 // SecretReader permite probar Kaggle Secrets sin una conexión real.
@@ -148,6 +148,7 @@ func parse(v map[string]string) (Config, error) {
 		MCPPublicURL:     value("MCP_PUBLIC_URL", ""),
 		MCPAccessPIN:     value("MCP_ACCESS_PIN", ""),
 		GitHubToken:      value("GITHUB_TOKEN", ""),
+		HFToken:          value("HF_TOKEN", ""),
 		DataDir:          "/kaggle/working/.kagmcp",
 		HostKey:          value("SSH_HOST_KEY", filepath.Join("/kaggle/working", ".kagmcp", "ssh", "host_ed25519")),
 		LoginUser:        value("SSH_LOGIN_USER", login),

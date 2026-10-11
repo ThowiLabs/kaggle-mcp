@@ -166,3 +166,22 @@ func TestLoad_RequiereHostDelVPS(t *testing.T) {
 		t.Fatalf("el binario no debe emplear dominios corporativos predeterminados: %v", err)
 	}
 }
+
+func TestTokenDeHuggingFaceDesdeEntorno(t *testing.T) {
+	values := map[string]string{
+		"MCP_ENABLED":  "true",
+		"SSH_ENABLED":  "false",
+		"HF_TOKEN":     "hf_prueba_unicamente",
+		"GITHUB_TOKEN": "github_pat_test",
+	}
+	cfg, err := Load(context.Background(), func(k string) (string, bool) {
+		v, ok := values[k]
+		return v, ok
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.HFToken != values["HF_TOKEN"] || cfg.GitHubToken != values["GITHUB_TOKEN"] {
+		t.Fatal("no se cargaron las variables de entorno de los proveedores")
+	}
+}

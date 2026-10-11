@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#09070b"><title>KagMCP · Axolotl Dashboard</title>
+<link rel="icon" href="/assets/axolotl.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/axolotl.css">
+<link rel="stylesheet" href="/assets/dashboard.css">
+<script src="/assets/dashboard.js" defer></script>
+</head>
+<body>
+{{if .Login}}
+<main class="login-wrap">
+  <section class="login-card card" aria-labelledby="login-title">
+    <img class="login-brand" src="/assets/axolotl.svg" alt="">
+    <span class="eyebrow">CONTROL DE INSTANCIA</span>
+    <h1 id="login-title">Bienvenido a KagMCP</h1>
+    <p>Acceso protegido al panel de tu instancia Kaggle.</p>
+    {{if .Message}}<p class="alert" role="alert">{{.Message}}</p>{{end}}
+    <form method="post" action="/login">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label for="pin">PIN de administración</label>
+      <input id="pin" name="pin" type="password" autocomplete="current-password" maxlength="128" placeholder="Introduce tu PIN" required autofocus>
+      <button class="action-primary full-width" type="submit">Acceder al panel →</button>
+    </form>
+    <div class="login-hint">🔒 Sesiones privadas de 8 horas · Intentos limitados · Protección CSRF</div>
+  </section>
+</main>
+{{else}}
+<div class="app" id="app">
+  <div class="mobile-sidebar-backdrop" id="mobileBackdrop"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-top">
+      <a class="brand" href="/" aria-label="KagMCP inicio"><img src="/assets/axolotl.svg" alt=""><span>Kag<span class="brand-accent">MCP</span><small>CONTROL CENTER</small></span></a>
+      <button type="button" id="collapseBtn" class="icon-button hide-mobile" aria-label="Contraer menú">«</button>
+    </div>
+    <nav class="nav" aria-label="Navegación">
+      <div class="nav-label">OPERACIÓN</div>
+      <a class="nav-item active" href="#overview"><span class="nav-icon">▦</span><span>Dashboard</span></a>
+      <a class="nav-item" href="#resources"><span class="nav-icon">◉</span><span>Recursos Kaggle</span></a>
+      <a class="nav-item" href="#projects"><span class="nav-icon">▤</span><span>Proyectos</span></a>
+      <a class="nav-item" href="#history"><span class="nav-icon">◷</span><span>Actividad</span></a>
+      <div class="nav-label">SISTEMA</div>
+      <a class="nav-item" href="#integrations"><span class="nav-icon">⚙</span><span>Integraciones</span></a>
+      <a class="nav-item" href="#skills"><span class="nav-icon">◇</span><span>Skills</span></a>
+      <a class="nav-item" href="#security"><span class="nav-icon">♙</span><span>Seguridad</span></a>
+    </nav>
+    <div class="sidebar-bottom"><span class="status-dot"></span><div><strong>Kaggle runtime</strong><small id="connectionStatus">Verificando métricas…</small></div></div>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      <div class="welcome">
+        <button type="button" id="menuBtn" class="icon-button mobile-menu" aria-label="Abrir navegación">☰</button>
+        <div><h1>Panel de control</h1><p>Estado de tu entorno Kaggle, proyectos y conexiones</p></div>
+      </div>
+      <div class="top-actions">
+        <span class="live-indicator"><span class="status-dot"></span> EN VIVO</span>
+        <span class="date-label" id="lastUpdated">Sin datos</span>
+        <form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button type="submit" class="logout-button">Salir ↗</button></form>
+      </div>
+    </header>
+    <div class="dashboard-content" id="overview">
+      <div class="hero">
+        <div><span class="eyebrow">KAGMCP · WORKSPACE</span><h2>Tu instancia, bajo control<span class="hero-dot">.</span></h2><p>Monitorea almacenamiento y GPU en tiempo real. Administra tus proyectos y conexiones desde un solo lugar.</p></div>
+        <span class="hero-mark">✦</span>
+      </div>
+      <section class="summary-stats" aria-label="Resumen del sistema">
+        <div class="stat-item"><span class="stat-icon">◉</span><div><small>Estado del runtime</small><strong id="runtimeState">Consultando</strong></div></div>
+        <div class="stat-item"><span class="stat-icon">▤</span><div><small>Proyectos</small><strong>{{len .Projects}}</strong></div></div>
+        <div class="stat-item"><span class="stat-icon">⌁</span><div><small>GitHub</small><strong>{{if .GitHubOn}}Conectado{{else}}Sin configurar{{end}}</strong></div></div>
+        <div class="stat-item"><span class="stat-icon">◇</span><div><small>Hugging Face</small><strong>{{if .HFOn}}Conectado{{else}}Sin configurar{{end}}</strong></div></div>
+      </section>
+      <section class="resource-grid" id="resources" aria-labelledby="resources-title">
+        <div class="section-heading"><div><span class="eyebrow">TELEMETRÍA</span><h2 id="resources-title">Recursos de la instancia</h2></div><small>Actualización automática cada 5 segundos</small></div>
+        <article class="card resource-card">
+          <div class="card-head"><div><span class="card-kicker">ALMACENAMIENTO</span><h3>/kaggle/working</h3></div><span class="card-status" id="diskStatus">Cargando</span></div>
+          <div class="resource-body"><div class="ring" id="diskRing" role="meter" aria-label="Uso de almacenamiento" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div><strong id="diskPct">—</strong><small>utilizado</small></div></div>
+          <div class="resource-detail"><span class="detail-title">Volumen de trabajo</span><strong id="diskUsed">—</strong><small id="diskTotal">Capacidad sin consultar</small><div class="metric-line"><span>Disponible</span><strong id="diskFree">—</strong></div><p class="metric-note" id="diskNote">Consultando estadísticas reales del volumen.</p></div></div>
+        </article>
+        <article class="card resource-card">
+          <div class="card-head"><div><span class="card-kicker">ACELERADOR NVIDIA</span><h3>Rendimiento GPU</h3></div><span class="card-status" id="gpuStatus">Cargando</span></div>
+          <div class="resource-body"><div class="ring gpu-ring" id="gpuRing" role="meter" aria-label="Utilización GPU" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div><strong id="gpuPct">—</strong><small>carga de GPU</small></div></div>
+          <div class="resource-detail"><span class="detail-title" id="gpuName">Detectando acelerador</span><strong id="gpuVram">—</strong><small id="gpuVramTotal">VRAM utilizada / total</small><div class="metric-line"><span>Temperatura</span><strong id="gpuTemp">—</strong></div><div class="metric-line"><span>GPU(s)</span><strong id="gpuCount">—</strong></div><p class="metric-note" id="gpuNote">Lectura con nvidia-smi.</p></div></div>
+          <div class="gpu-selector" id="gpuDevices" aria-label="Elegir GPU"></div>
+        </article>
+      </section>
+      <section class="work-grid" id="integrations">
+        <article class="card section-card"><div class="card-head"><div><span class="card-kicker">CREDENCIALES</span><h3>Integraciones</h3></div><span class="mini-icon">⌁</span></div>
+        <p>Los tokens se validan, se mantienen en el proceso y se exponen a las herramientas autorizadas como variables de entorno. No se guardan en disco.</p>
+        <div class="integration-item"><div><strong>GitHub</strong><small>{{if .GitHubOn}}Token configurado{{else}}Conecta tu cuenta para operar repositorios{{end}}</small></div><span class="pill">{{if .GitHubOn}}Activo{{else}}Inactivo{{end}}</span></div>
+        <form method="post" action="/github" class="inline-token"><input type="hidden" name="csrf" value="{{.CSRF}}"><label for="githubToken">GITHUB_TOKEN</label><input id="githubToken" name="token" type="password" autocomplete="off" maxlength="4096" placeholder="github_pat_…"><button type="submit">Guardar</button></form>
+        <div class="integration-item"><div><strong>Hugging Face</strong><small>{{if .HFOn}}Token configurado{{else}}Conecta tu cuenta para usar el Hub{{end}}</small></div><span class="pill">{{if .HFOn}}Activo{{else}}Inactivo{{end}}</span></div>
+        <form method="post" action="/huggingface" class="inline-token"><input type="hidden" name="csrf" value="{{.CSRF}}"><label for="hfToken">HF_TOKEN</label><input id="hfToken" name="token" type="password" autocomplete="off" maxlength="4096" placeholder="hf_…"><button type="submit">Guardar</button></form>
+        <small class="muted">Envía el campo vacío para eliminar el token del proceso actual. Los cambios son temporales.</small>
+        </article>
+        <article class="card section-card" id="projects"><div class="card-head"><div><span class="card-kicker">ORGANIZACIÓN</span><h3>Nuevo proyecto</h3></div><span class="mini-icon">▤</span></div>
+        <p>Centraliza los repositorios, cuadernos y decisiones del equipo.</p>
+        <form method="post" action="/project" class="project-form"><input type="hidden" name="csrf" value="{{.CSRF}}"><label>ID del proyecto<input name="id" pattern="[a-zA-Z0-9_-]+" maxlength="80" placeholder="mi-proyecto" required></label><label>Nombre<input name="name" maxlength="200" placeholder="Mi proyecto Kaggle" required></label><label>Repositorio GitHub<input name="repository" placeholder="usuario/repositorio"></label><label>Notebook<input name="notebook" placeholder="notebooks/proyecto.ipynb"></label><button type="submit" class="action-primary">Crear proyecto →</button></form>
+        </article>
+      </section>
+      <section class="projects-section" aria-label="Proyectos guardados">
+      {{range .Projects}}{{$project := .ID}}
+        <article class="card project-card"><div class="card-head"><div><span class="card-kicker">PROYECTO · {{.ID}}</span><h3>{{.Name}}</h3></div>{{if .Verification}}<span class="pill">Verificado</span>{{else}}<span class="pill">Pendiente</span>{{end}}</div>
+        <p>Repositorio: {{.Repository}} · Notebook: {{.Notebook}}</p>
+        <div class="project-actions"><form action="/export" method="post"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{.ID}}"><button>Exportar contexto</button></form><form action="/import" method="post"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{.ID}}"><button>Restaurar contexto</button></form></div>
+        <div class="project-columns"><div><h4>Memoria</h4>{{range .Memory}}<p class="entry">{{.}}</p>{{else}}<p class="muted">Sin notas todavía.</p>{{end}}<form action="/memory" method="post"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{.ID}}"><textarea name="text" placeholder="Guardar decisión o contexto..." maxlength="6000" required></textarea><button>Guardar nota</button></form></div><div><h4>Tareas</h4>{{range .Tasks}}<div class="task-row"><div><strong>{{.Title}}</strong><small>{{.Status}}</small></div><form method="post" action="/task-status"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{$project}}"><input type="hidden" name="task" value="{{.ID}}"><select name="status"><option value="pending">Pendiente</option><option value="in_progress">En progreso</option><option value="done">Completa</option></select><button>✓</button></form></div>{{else}}<p class="muted">No hay tareas.</p>{{end}}<form method="post" action="/task"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{.ID}}"><input name="title" maxlength="300" placeholder="Nueva tarea" required><button>Añadir tarea</button></form></div></div></article>
+      {{else}}<div class="empty-projects card">◇ Aún no hay proyectos registrados. Crea el primero desde el formulario.</div>{{end}}
+      </section>
+      <section class="work-grid lower-grid">
+        <article class="card section-card" id="skills"><div class="card-head"><div><span class="card-kicker">HERRAMIENTAS</span><h3>Skills disponibles</h3></div></div><p>Ponytail v2 permanece activa en los proyectos.</p>
+          {{range .SkillList}}<a class="skill-entry" href="/skills?name={{.Name}}"><strong>{{.Name}}</strong>{{if .AlwaysActive}}<span class="pill">Activa</span>{{end}}<small>{{.Description}}</small></a>{{end}}
+          {{if .SkillName}}<h4>{{.SkillName}}</h4><pre>{{.SkillContent}}</pre>{{if .NextOffset}}<a href="/skills?name={{.SkillName}}&amp;offset={{.NextOffset}}">Ver siguiente fragmento →</a>{{end}}{{end}}
+        </article>
+        <article class="card section-card" id="security"><div class="card-head"><div><span class="card-kicker">CUENTA</span><h3>Seguridad del panel</h3></div></div><p>El PIN protege el acceso a este panel y las conexiones autorizadas. Cambiarlo revoca todas las sesiones y autorizaciones OAuth.</p>
+          <form method="post" action="/change-pin" class="security-form"><input type="hidden" name="csrf" value="{{.CSRF}}"><label>PIN actual<input type="password" name="current_pin" autocomplete="current-password" maxlength="128" required></label><label>Nuevo PIN<input type="password" name="new_pin" autocomplete="new-password" minlength="6" maxlength="128" required></label><button type="submit" class="action-primary">Actualizar PIN y cerrar sesiones</button></form>
+        </article>
+      </section>
+      <section class="card section-card history-card" id="history"><div class="card-head"><div><span class="card-kicker">AUDITORÍA</span><h3>Historial de comandos</h3></div></div><p>Registro compartido de las operaciones. Evita incluir credenciales en comandos.</p>{{range .History}}<div class="history-entry"><span class="pill">{{.Status}}</span><div><strong>{{.Description}}</strong><small>{{.When.Format "2006-01-02 15:04:05"}} · {{.Project}}</small><pre>{{.Command}}</pre></div></div>{{else}}<p class="muted">Sin actividad registrada.</p>{{end}}</section>
+      <footer>Datos del runtime: /kaggle/working/.kagmcp · Guarda tu contexto en Git antes de finalizar la sesión.</footer>
+    </div>
+  </main>
+</div>
+{{end}}
+</body></html>

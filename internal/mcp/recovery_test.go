@@ -96,6 +96,9 @@ func TestReconnectedServerPreservesChangedPINAndProjectsButRenewsOAuth(t *testin
 	old.github = githubtoken.New("fake-github-pat")
 	old.githubOn = true
 	old.githubMu.Unlock()
+	old.hfMu.Lock()
+	old.hfToken = "hf_test_reconnect"
+	old.hfMu.Unlock()
 	renewed, err := rebuildMCPForPublic(old.cfg, old, "https://second.gradio.live")
 	if err != nil {
 		t.Fatal(err)
@@ -108,6 +111,9 @@ func TestReconnectedServerPreservesChangedPINAndProjectsButRenewsOAuth(t *testin
 	}
 	if renewed.githubClient() != old.githubClient() || !renewed.githubConfigured() {
 		t.Fatal("se perdió PAT GitHub de sesión")
+	}
+	if !renewed.hfConfigured() || renewed.hfToken != "hf_test_reconnect" {
+		t.Fatal("se perdió token Hugging Face de sesión")
 	}
 	if renewed.public != "https://second.gradio.live" {
 		t.Fatal("OAuth no tiene URL actual")

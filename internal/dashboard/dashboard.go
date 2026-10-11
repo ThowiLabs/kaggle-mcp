@@ -5,9 +5,13 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
+	"embed"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"github.com/ThowiLabs/kagssh-go/internal/diskguard"
+	"github.com/ThowiLabs/kagssh-go/internal/gpumetrics"
 	"github.com/ThowiLabs/kagssh-go/internal/pinauth"
 	"github.com/ThowiLabs/kagssh-go/internal/projectstate"
 	"github.com/ThowiLabs/kagssh-go/internal/skills"
@@ -16,6 +20,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -36,6 +41,8 @@ type Handler struct {
 	Skills           skills.Registry
 	GitHub           func(context.Context, string) (string, error)
 	GitHubConfigured func() bool
+	HuggingFace      func(context.Context, string) (string, error)
+	HFConfigured     func() bool
 	Export           func(string) (any, error)
 	Import           func(string) (any, error)
 	mu               sync.Mutex
@@ -60,7 +67,7 @@ func cookie(w http.ResponseWriter, name, value string, age int) {
 	http.SetCookie(w, &http.Cookie{Name: name, Value: value, Path: "/", MaxAge: age, Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode})
 }
 func (h *Handler) security(w http.ResponseWriter) {
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; img-src 'self'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
@@ -226,20 +233,33 @@ type view struct {
 	SkillName    string
 	NextOffset   int
 	GitHubOn     bool
+	HFOn         bool
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.security(w)
+	if strings.HasPrefix(r.URL.Path, "/assets/") {
+		h.serveAsset(w, r)
+		return
+	}
 	if r.URL.Path == "/login" {
 		h.login(w, r)
 		return
 	}
-	if r.URL.Path != "/" && r.URL.Path != "/skills" && r.URL.Path != "/project" && r.URL.Path != "/memory" && r.URL.Path != "/task" && r.URL.Path != "/task-status" && r.URL.Path != "/github" && r.URL.Path != "/export" && r.URL.Path != "/import" && r.URL.Path != "/change-pin" && r.URL.Path != "/logout" {
+	if r.URL.Path != "/" && r.URL.Path != "/skills" && r.URL.Path != "/project" && r.URL.Path != "/memory" && r.URL.Path != "/task" && r.URL.Path != "/task-status" && r.URL.Path != "/github" && r.URL.Path != "/huggingface" && r.URL.Path != "/api/metrics" && r.URL.Path != "/export" && r.URL.Path != "/import" && r.URL.Path != "/change-pin" && r.URL.Path != "/logout" {
 		http.NotFound(w, r)
 		return
 	}
 	sess, ok := h.Verify(w, r)
 	if !ok {
+		return
+	}
+	if r.URL.Path == "/api/metrics" {
+		if r.Method != http.MethodGet {
+			http.Error(w, "método no permitido", http.StatusMethodNotAllowed)
+			return
+		}
+		h.metrics(w, r)
 		return
 	}
 	if r.Method == http.MethodGet {
@@ -248,7 +268,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		state := h.Projects.Snapshot()
-		v := view{CSRF: sess.CSRF, Projects: state.Projects, History: state.History, GitHubOn: h.GitHubConfigured()}
+		v := view{CSRF: sess.CSRF, Projects: state.Projects, History: state.History, GitHubOn: h.GitHubConfigured(), HFOn: h.HFConfigured != nil && h.HFConfigured()}
 		v.SkillList, _ = h.Skills.List()
 		if r.URL.Path == "/skills" {
 			name := r.URL.Query().Get("name")
@@ -326,6 +346,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else {
 			_, err = h.Import(r.FormValue("project"))
 		}
+	case "/huggingface":
+		if h.HuggingFace == nil {
+			err = errors.New("Hugging Face no disponible")
+		} else {
+			_, err = h.HuggingFace(r.Context(), r.FormValue("token"))
+		}
 	case "/github":
 		if h.GitHub == nil {
 			err = errors.New("GitHub no disponible")
@@ -347,13 +373,53 @@ func (h *Handler) page(w http.ResponseWriter, v view) {
 	_ = pageTemplate.Execute(w, v)
 }
 
-var pageTemplate = template.Must(template.New("dashboard").Parse(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KagMCP · Control</title><style>
-:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#0a101b;color:#eaf1ff}body{margin:0;padding:25px;max-width:1150px;margin:auto}h1{font-size:2.1rem;margin:0 0 8px}h2{font-size:1.1rem}p,small{color:#a9b7cd}a{color:#9dc5ff;text-decoration:none}.muted{font-size:.85rem;color:#91a3be}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:16px;margin-top:20px}.card{background:#111b2c;border:1px solid #2c3b52;border-radius:15px;padding:20px;overflow-wrap:anywhere}.panel{margin-top:20px;background:#101a2b;border:1px solid #293852;border-radius:15px;padding:18px}input,textarea,select,button{box-sizing:border-box;font:inherit;color:#eaf1ff}input,textarea,select{background:#081223;border:1px solid #42536c;border-radius:9px;padding:10px;width:100%;margin:6px 0 12px}textarea{min-height:83px}button{background:#447be8;border:0;border-radius:9px;cursor:pointer;padding:10px 15px}button:hover{background:#6799fb}form{margin:0}header{display:flex;justify-content:space-between;align-items:center;gap:20px}.badge{font-size:.8rem;background:#21374d;border-radius:30px;padding:6px 10px}.entry{border-top:1px solid #26364c;padding:10px 0}.entry:first-of-type{border-top:0}pre{white-space:pre-wrap;word-break:break-word;background:#081223;border-radius:10px;padding:14px;font-size:.78rem;max-height:520px;overflow:auto}.login{max-width:440px;margin:12vh auto}.flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.flex form{display:inline-block}.light{border:1px solid #40516d;background:none}code{font-size:.85rem;color:#bcd4ff}hr{border:0;border-top:1px solid #2c3b52}label{font-size:.85rem;color:#b8c8e2}
-</style></head><body>{{if .Login}}<main class="card login"><h1>🔐 KagMCP</h1><p>Acceso administrativo al runtime autorizado</p>{{if .Message}}<p role="alert" style="color:#ffbbb5">{{.Message}}</p>{{end}}<form method="post" action="/login"><input type="hidden" name="csrf" value="{{.CSRF}}"><label for="pin">PIN de administración</label><input id="pin" name="pin" type="password" autocomplete="current-password" maxlength="128" required><button type="submit">Iniciar sesión</button></form><p class="muted">Sesiones privadas, caducidad de 8 horas y protección contra intentos repetidos.</p></main>{{else}}<header><div><h1>KagMCP <span class="badge">Ponytail v2 activa</span></h1><p>Proyectos, tareas, memoria e historial compartido</p></div><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="light">Cerrar sesión</button></form></header>
-<section class="cards"><article class="card"><h2>Nuevo proyecto</h2><form action="/project" method="post"><input type="hidden" name="csrf" value="{{.CSRF}}"><label>ID (a-z, 0-9, - y _)</label><input name="id" placeholder="proyecto-demo" required><label>Nombre</label><input name="name" required><label>Repositorio Git</label><input name="repository" placeholder="owner/repo"><label>Cuaderno</label><input name="notebook" placeholder="notebooks/ejemplo.ipynb"><button>Crear proyecto</button></form></article>
-<article class="card"><h2>Cambiar PIN</h2><p>PIN actual obligatorio. Nuevo PIN de 6 a 128 caracteres. Al cambiarlo se revocan las conexiones OAuth y las sesiones web; deberás volver a autenticar los agentes.</p><form action="/change-pin" method="post"><input type="hidden" name="csrf" value="{{.CSRF}}"><label>PIN actual</label><input type="password" name="current_pin" autocomplete="current-password" required maxlength="128"><label>Nuevo PIN</label><input type="password" name="new_pin" autocomplete="new-password" minlength="6" maxlength="128" required><button>Cambiar PIN y cerrar sesiones</button></form></article><article class="card"><h2>GitHub</h2><p>{{if .GitHubOn}}Token activo solo en memoria{{else}}Token no configurado{{end}}. Se comprueba antes de guardarlo; jamás se escribe en disco.</p><form action="/github" method="post"><input type="hidden" name="csrf" value="{{.CSRF}}"><label>Personal Access Token</label><input type="password" name="token" autocomplete="off" placeholder="ghp_… / github_pat_…" maxlength="4096"><button>Configurar PAT</button></form><p class="muted">Para desactivar, envía el campo vacío. El token se perderá al reiniciar el proceso.</p></article>
-<article class="card"><h2>Skills</h2><p><strong>Ponytail v2 siempre activa</strong></p>{{range .SkillList}}<div class="entry"><a href="/skills?name={{.Name}}">{{.Name}}</a>{{if .AlwaysActive}} <span class="badge">Siempre activa</span>{{end}}<div class="muted">{{.Description}}</div></div>{{end}}</article></section>
-{{range .Projects}}{{$project := .ID}}<section class="panel"><h2>📁 {{.Name}} <code>{{.ID}}</code></h2><p>Repositorio: {{.Repository}} · Cuaderno: {{.Notebook}}</p>{{if .Verification}}<p class="muted">Pruebas registradas: {{.Verification.TestedAt.Format "2006-01-02 15:04 UTC"}} · commit {{.Verification.GitHead}}</p>{{else}}<p class="muted">Pendiente: ejecutar project_verify antes de generar Gradio.</p>{{end}}<form method="post" action="/export"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{.ID}}"><button class="light">Exportar memoria y tareas al repositorio</button></form><form method="post" action="/import"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{.ID}}"><button class="light">Restaurar memoria desde el repositorio</button></form><div class="cards"><article><h2>Memoria compartida</h2>{{range .Memory}}<p class="entry">{{.}}</p>{{else}}<p>Sin notas todavía.</p>{{end}}<form method="post" action="/memory"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{.ID}}"><textarea name="text" placeholder="Decisión técnica o contexto persistente" maxlength="6000" required></textarea><button>Guardar memoria</button></form></article><article><h2>Lista de tareas</h2>{{range .Tasks}}<div class="entry"><strong>{{.Title}}</strong> <span class="muted">{{.Status}}</span><form method="post" action="/task-status" class="flex"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{$project}}"><input type="hidden" name="task" value="{{.ID}}"><select name="status"><option value="pending">Pendiente</option><option value="in_progress">En progreso</option><option value="done">Completa</option></select><button>Actualizar</button></form></div>{{else}}<p>Sin tareas.</p>{{end}}<form method="post" action="/task"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{.ID}}"><input name="title" maxlength="300" placeholder="Nueva tarea" required><button>Añadir tarea</button></form></article></div></section>{{end}}
-<section class="panel"><h2>Historial de comandos</h2><p>Registro compartido y acotado. Evita introducir secretos en comandos.</p>{{range .History}}<div class="entry"><strong>{{.Description}}</strong> <span class="badge">{{.Status}}</span> <span class="muted">{{.When.Format "2006-01-02 15:04:05"}} · {{.Project}}</span><pre>{{.Command}}</pre></div>{{else}}<p>Aún no hay comandos registrados.</p>{{end}}</section>
-{{if .SkillName}}<section class="panel"><h2>Skill · {{.SkillName}}</h2><pre>{{.SkillContent}}</pre><a href="/skills?name={{.SkillName}}&amp;offset={{.NextOffset}}">Siguiente fragmento →</a></section>{{end}}
-<footer><p>Los datos se almacenan en /kaggle/working/.kagmcp. Versiona el contexto relevante antes de destruir el runtime.</p><p><a href="/">Volver al inicio</a></p></footer>{{end}}</body></html>`))
+// Recursos autocontenidos: sin CDN ni dependencias externas durante Kaggle.
+//
+//go:embed ui/*
+var uiFiles embed.FS
+
+func (h *Handler) serveAsset(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "método no permitido", http.StatusMethodNotAllowed)
+		return
+	}
+	name := strings.TrimPrefix(r.URL.Path, "/assets/")
+	kind := ""
+	switch name {
+	case "axolotl.css", "dashboard.css":
+		kind = "text/css; charset=utf-8"
+	case "dashboard.js":
+		kind = "application/javascript; charset=utf-8"
+	case "axolotl.svg":
+		kind = "image/svg+xml"
+	default:
+		http.NotFound(w, r)
+		return
+	}
+	b, err := uiFiles.ReadFile("ui/" + name)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", kind)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(b)
+}
+
+func (h *Handler) metrics(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+	report, err := gpumetrics.New().Metrics(ctx)
+	if err != nil {
+		report = gpumetrics.Report{Available: false, Status: "error", Reason: "No se pudieron leer las métricas GPU"}
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"time":    time.Now().UTC(),
+		"storage": diskguard.Usage("/kaggle/working"),
+		"gpu":     report,
+	})
+}
+
+var pageData, _ = uiFiles.ReadFile("ui/page.html")
+var pageTemplate = template.Must(template.New("dashboard").Parse(string(pageData)))
