@@ -1,0 +1,10 @@
+.env
+*.exe
+bin/
+dist/
+*.log
+host_ed25519
+known_hosts
+.kagmcp/
+__pycache__/
+*.pyc

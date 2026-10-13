@@ -1,0 +1,233 @@
+name: Publicar KagMCP
+
+# Ejecución manual: versión opcional; vacío = siguiente número X.Y.
+# También se publica al subir un tag numérico 1.0 o v1.0.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Opcional: 1.0, 2.5, beta-1... Vacío = 1.0, 1.1, 1.2..."
+        required: false
+        default: ""
+        type: string
+  push:
+    tags:
+      - "v*"
+      - "[0-9]*"
+
+permissions:
+  contents: read
+
+# Evita que dos ejecuciones automáticas obtengan simultáneamente
+# el mismo número antes de crear sus tags.
+concurrency:
+  group: kagmcp-release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Verificar y compilar Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      commit_sha: ${{ steps.commit.outputs.sha }}
+      tag: ${{ steps.version.outputs.tag }}
+    env:
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+    steps:
+      - name: Checkout con tags existentes
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolver versión personalizada o automática
+        id: version
+        shell: bash
+        env:
+          MANUAL_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="$(python3 scripts/release_version.py "$GITHUB_EVENT_NAME" "$GITHUB_REF" "$DEFAULT_BRANCH" "$MANUAL_VERSION")"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Versión seleccionada: $TAG"
+          echo "### Versión seleccionada: $TAG" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Exigir tags nacidos de la rama predeterminada
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git merge-base --is-ancestor HEAD "refs/remotes/origin/$DEFAULT_BRANCH"; then
+            echo "::error::El tag no pertenece al historial de la rama predeterminada."
+            exit 1
+          fi
+
+      - name: Registrar commit verificado
+        id: commit
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Configurar Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Validar notebook Kaggle y lógica de versiones
+        run: |
+          python3 scripts/check_notebook.py
+          python3 -m unittest discover -s scripts -p 'test_release_version.py'
+
+      - name: Verificar renderizado de actividad
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check internal/dashboard/ui/activity.js
+          node --check internal/dashboard/ui/dashboard.js
+          node scripts/test_activity_render.cjs
+          node scripts/test_gpu_visibility.cjs
+
+      - name: Pruebas y análisis estático
+        shell: bash
+        run: |
+          set -euo pipefail
+          go version
+          go test -timeout 120s ./...
+          go vet ./...
+
+      - name: Compilar y empaquetar Linux AMD64 y ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            binary="kagmcp-${TAG}-linux-${arch}"
+            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" \
+              go build -buildvcs=false -trimpath \
+              -ldflags="-s -w -X main.version=$TAG" \
+              -o "dist/$binary" ./cmd/kagssh
+            chmod 755 "dist/$binary"
+            file "dist/$binary"
+            if readelf -l "dist/$binary" | grep -q INTERP; then
+              echo "::error::El binario $arch es dinámico; se esperaba estático."
+              exit 1
+            fi
+            zip -j "dist/${binary}.zip" "dist/$binary" README.md USO_Y_CONFIGURACION.md
+            unzip -t "dist/${binary}.zip"
+          done
+          ./dist/kagmcp-${TAG}-linux-amd64 -version | grep -Fx "kagmcp $TAG"
+          (
+            cd dist
+            sha256sum kagmcp-* > SHA256SUMS.txt
+            sha256sum -c SHA256SUMS.txt
+          )
+
+      - name: Transferir artefactos verificados al job de publicación
+        uses: actions/upload-artifact@v4
+        with:
+          name: kagmcp-release-bundles
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  publish:
+    name: Crear tag y GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.build.outputs.tag }}
+      COMMIT_SHA: ${{ needs.build.outputs.commit_sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Recuperar archivos compilados
+        uses: actions/download-artifact@v4
+        with:
+          name: kagmcp-release-bundles
+          path: dist
+
+      - name: Verificar sumas y paquetes
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$COMMIT_SHA" =~ ^[[:xdigit:]]{40}$ ]] || { echo "::error::SHA inválido"; exit 1; }
+          (
+            cd dist
+            sha256sum -c SHA256SUMS.txt
+            test "$(find . -maxdepth 1 -name '*.zip' -type f | wc -l)" -eq 2
+            test "$(find . -maxdepth 1 -name 'kagmcp-*-linux-*' -type f ! -name '*.zip' | wc -l)" -eq 2
+          )
+
+      - name: Crear tag sin sobrescribir versiones y publicar Release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # No alterar una Release existente ni sus assets.
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::La Release $TAG ya existe. Utiliza una nueva versión."
+            exit 1
+          fi
+
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            # La API /git/ref/tags/X devuelve HTTP 404 cuando falta el tag.
+            # gh api puede imprimir el JSON de error por stdout incluso con --jq:
+            # NUNCA usar "2>/dev/null || true" para decidir si el tag existe.
+            # matching-refs devuelve [] con HTTP 200 cuando no hay coincidencias.
+            matches="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$TAG")"
+            # matching-refs también devuelve coincidencias por prefijo:
+            # comparar el nombre EXACTO (1.1 no debe confundir con 1.10).
+            exact_ref="$(jq -c --arg ref "refs/tags/$TAG" \
+              'if type != "array" then error("Respuesta inválida de GitHub") else .[] | select(.ref == $ref) end' \
+              <<< "$matches")"
+
+            if [[ -z "$exact_ref" ]]; then
+              echo "Tag $TAG no existe; creándolo sobre el commit verificado $COMMIT_SHA"
+              gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+                -f "ref=refs/tags/$TAG" -f "sha=$COMMIT_SHA" >/dev/null
+            else
+              existing="$(jq -er '.object.sha' <<< "$exact_ref")"
+              ref_type="$(jq -er '.object.type' <<< "$exact_ref")"
+              # Los tags anotados apuntan a un objeto TAG y no directamente
+              # a un commit; desreferenciarlo antes de comparar.
+              if [[ "$ref_type" == "tag" ]]; then
+                object="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$existing")"
+                ref_type="$(jq -er '.object.type' <<< "$object")"
+                existing="$(jq -er '.object.sha' <<< "$object")"
+              fi
+              if [[ "$ref_type" != "commit" ]]; then
+                echo "::error::El tag $TAG no apunta a un commit (tipo $ref_type)."
+                exit 1
+              fi
+              if [[ "$existing" != "$COMMIT_SHA" ]]; then
+                echo "::error::El tag $TAG ya existe y apunta a $existing, distinto del commit probado $COMMIT_SHA. Usa Version vacío para publicar la siguiente versión; no se sobrescribirán tags."
+                exit 1
+              fi
+              echo "Tag $TAG ya existe en el mismo commit verificado; retomando la Release."
+            fi
+          fi
+
+          flags=(--verify-tag --generate-notes --title "KagMCP $TAG")
+          if [[ "$TAG" == *-* ]]; then
+            flags+=(--prerelease)
+          fi
+          # GitHub CLI crea un borrador, sube los assets y luego publica.
+          gh release create "$TAG" dist/* "${flags[@]}" --repo "$GITHUB_REPOSITORY"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY"
+
+      - name: Resumen con enlace directo
+        if: success()
+        shell: bash
+        run: |
+          {
+            echo "### Publicado: $TAG"
+            echo ""
+            echo "Incluye los binarios Linux AMD64 y ARM64, sus ZIP y SHA256SUMS.txt."
+            echo ""
+            echo "https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
+          } >> "$GITHUB_STEP_SUMMARY"

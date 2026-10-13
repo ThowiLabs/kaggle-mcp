@@ -1,0 +1,3 @@
+# Hardening antes de venta comercial multiusuario
+
+Pendiente: asignar identidad/autorización por subagente (el campo agent actual es etiqueta), imponer aislamiento en worktree/sandbox con permisos reales en lugar de solo instrucciones de prompt, validación de commit/branch y pruebas en MCP de destino, reconciliación y bloqueo de cambios concurrentes cross-process, auditoría y backup persistente fuera de sesiones Kaggle, revocación de agentes en ejecución, QA de extremo a extremo con dos chats reales, HTTPS y migración de estado. No afirmar que MVP ya aísla operaciones externas ni que arranca chats automáticamente.

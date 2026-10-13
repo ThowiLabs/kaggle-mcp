@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#09070b"><title>KagMCP · Axolotl Dashboard</title>
+<link rel="icon" href="/assets/axolotl.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/axolotl.css">
+<link rel="stylesheet" href="/assets/dashboard.css">
+<script src="/assets/dashboard.js" defer></script>
+{{if eq .Page "activity"}}<script src="/assets/activity.js" defer></script>{{end}}
+</head>
+<body>
+{{if .Login}}
+<main class="login-wrap">
+  <section class="login-card card" aria-labelledby="login-title">
+    <img class="login-brand" src="/assets/axolotl.svg" alt="">
+    <span class="eyebrow">CONTROL DE INSTANCIA</span>
+    <h1 id="login-title">Bienvenido a KagMCP</h1>
+    <p>Acceso protegido al panel de tu instancia Kaggle.</p>
+    {{if .Message}}<p class="alert" role="alert">{{.Message}}</p>{{end}}
+    <form method="post" action="/login">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label for="pin">PIN de administración</label>
+      <input id="pin" name="pin" type="password" autocomplete="current-password" maxlength="128" placeholder="Introduce tu PIN" required autofocus>
+      <button class="action-primary full-width" type="submit">Acceder al panel →</button>
+    </form>
+    <div class="login-hint">🔒 Sesiones persistentes de 7 días · Intentos limitados · Protección CSRF</div>
+  </section>
+</main>
+{{else}}
+<div class="app" id="app">
+  <div class="mobile-sidebar-backdrop" id="mobileBackdrop" aria-hidden="true"></div>
+  <aside class="sidebar" id="sidebar" aria-label="Navegación principal">
+    <div class="sidebar-top">
+      <a class="brand" href="/" aria-label="KagMCP inicio"><img src="/assets/axolotl.svg" alt=""><span>Kag<span class="brand-accent">MCP</span><small>CONTROL CENTER</small></span></a>
+      <button type="button" id="collapseBtn" class="icon-button hide-mobile" aria-label="Contraer menú" aria-expanded="true" aria-controls="sidebar" title="Contraer menú">«</button>
+    </div>
+    <nav class="nav" aria-label="Navegación">
+      <div class="nav-label">OPERACIÓN</div>
+      <a class="nav-item {{if eq .Page "dashboard"}}active{{end}}" href="/dashboard" aria-label="Dashboard" title="Dashboard"><span class="nav-icon">▦</span><span>Dashboard</span></a>
+      <a class="nav-item {{if eq .Page "resources"}}active{{end}}" href="/resources" aria-label="Recursos Kaggle" title="Recursos Kaggle"><span class="nav-icon">◉</span><span>Recursos Kaggle</span></a>
+      <a class="nav-item {{if eq .Page "projects"}}active{{end}}" href="/projects" aria-label="Proyectos" title="Proyectos"><span class="nav-icon">▤</span><span>Proyectos</span></a>
+      <a class="nav-item {{if eq .Page "agents"}}active{{end}}" href="/agents" aria-label="Agentes" title="Agentes"><span class="nav-icon">◎</span><span>Agentes</span></a>
+      <a class="nav-item {{if eq .Page "activity"}}active{{end}}" href="/activity" aria-label="Actividad" title="Actividad"><span class="nav-icon">◷</span><span>Actividad</span></a>
+      <div class="nav-label">SISTEMA</div>
+      <a class="nav-item {{if eq .Page "integrations"}}active{{end}}" href="/integrations" aria-label="Integraciones" title="Integraciones"><span class="nav-icon">⚙</span><span>Integraciones</span></a>
+      <a class="nav-item {{if eq .Page "skills"}}active{{end}}" href="/skills" aria-label="Skills" title="Skills"><span class="nav-icon">◇</span><span>Skills</span></a>
+      <a class="nav-item {{if eq .Page "security"}}active{{end}}" href="/security" aria-label="Seguridad" title="Seguridad"><span class="nav-icon">♙</span><span>Seguridad</span></a>
+    </nav>
+    <div class="sidebar-bottom"><span class="status-dot"></span><div><strong>Kaggle runtime</strong><small id="connectionStatus">Esperando telemetría…</small></div></div>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      <div class="welcome">
+        <button type="button" id="menuBtn" class="icon-button mobile-menu" aria-label="Abrir navegación" aria-expanded="false" aria-controls="sidebar">☰</button>
+        <div><h1>{{.PageTitle}}</h1><p>{{.PageSubtitle}}</p></div>
+      </div>
+      <div class="top-actions">
+        <span class="live-indicator" id="liveIndicator"><span class="status-dot"></span><span id="liveLabel">ESPERANDO</span></span>
+        <span class="date-label" id="lastUpdated">Sin datos</span>
+        <form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button type="submit" class="logout-button">Salir ↗</button></form>
+      </div>
+    </header>
+
+<div class="dashboard-content" id="overview">
+{{if eq .Page "dashboard"}}
+<div class="hero">
+        <div><span class="eyebrow">KAGMCP · WORKSPACE</span><h2>Tu instancia, bajo control<span class="hero-dot">.</span></h2><p>Monitorea almacenamiento y GPU en tiempo real. Administra tus proyectos y conexiones desde un solo lugar.</p></div>
+        <span class="hero-mark">✦</span>
+      </div>
+      <section class="summary-stats" aria-label="Resumen del sistema">
+        <div class="stat-item"><span class="stat-icon">◉</span><div><small>Estado del runtime</small><strong id="runtimeState">Consultando</strong></div></div>
+        <div class="stat-item"><span class="stat-icon">▤</span><div><small>Proyectos</small><strong>{{len .Projects}}</strong></div></div>
+        <div class="stat-item"><span class="stat-icon">⌁</span><div><small>GitHub</small><strong>{{if .GitHubOn}}Conectado{{else}}Sin configurar{{end}}</strong></div></div>
+        <div class="stat-item"><span class="stat-icon">◇</span><div><small>Hugging Face</small><strong>{{if .HFOn}}Conectado{{else}}Sin configurar{{end}}</strong></div></div>
+      </section>
+
+
+<section class="card server-metrics" id="server-metrics-section" aria-labelledby="monitorTitle">
+ <div class="monitor-heading"><div><span class="eyebrow">MONITOR · AXOLOTL</span><h2 id="monitorTitle">Recursos de la instancia</h2><p>Lecturas reales cada 5 segundos. CPU y RAM del contenedor si cgroups están disponibles; volumen de trabajo de Kaggle.</p></div><span class="server-status" id="serverStatus">Consultando</span></div>
+ <div class="server-grid">
+ <article class="server-card cpu">
+  <div class="server-card-head"><div><strong>CPU</strong><small>Carga de procesamiento</small></div><div class="server-value" id="cpuTopValue">—</div></div>
+  <div class="gauge-layout"><div class="speed-gauge"><svg viewBox="0 0 210 125" role="img" aria-label="Uso de CPU">
+<defs><linearGradient id="cpuGradient" x1="0" x2="1"><stop offset="0%" stop-color="#fc779b"/><stop offset="75%" stop-color="#fcbdd5"/><stop offset="100%" stop-color="#d49af6"/></linearGradient></defs>
+<path class="gauge-track" d="M 25 105 A 80 80 0 0 1 185 105"/>
+<path class="gauge-progress" id="cpuGaugeArc" d="M 25 105 A 80 80 0 0 1 185 105" style="stroke:url(#cpuGradient)"/>
+<g id="cpuGaugeNeedle" class="gauge-needle" transform="rotate(-90 105 105)"><line x1="105" y1="105" x2="105" y2="39"/></g>
+<circle class="gauge-center-dot" cx="105" cy="105" r="7"/><text class="gauge-scale" x="19" y="121">0</text><text class="gauge-scale" x="101" y="18">50</text><text class="gauge-scale" x="181" y="121">100</text>
+</svg><div class="gauge-readout"><strong id="cpuGaugeValue">—</strong><span>carga CPU</span></div></div>
+   <div class="cpu-summary"><div class="cpu-mini-stat"><span>Origen</span><strong id="cpuSource">Consultando</strong></div><div class="cpu-mini-stat"><span>Capacidad</span><strong id="cpuCapacity">—</strong></div><div class="cpu-mini-stat"><span>Núcleos visibles</span><strong id="cpuCores">—</strong></div><div class="cpu-mini-stat"><span>Actualización</span><strong id="cpuRefresh">5 s</strong></div></div>
+  </div>
+ </article>
+ <article class="server-card ram">
+  <div class="server-card-head"><div><strong>RAM</strong><small>Memoria del contenedor</small></div><div class="server-value" id="ramTopValue">—</div></div>
+  <div class="gauge-layout ram-layout"><div class="speed-gauge"><svg viewBox="0 0 210 125" role="img" aria-label="Uso de memoria RAM">
+<defs><linearGradient id="ramGradient" x1="0" x2="1"><stop offset="0%" stop-color="#fc779b"/><stop offset="75%" stop-color="#fcbdd5"/><stop offset="100%" stop-color="#d49af6"/></linearGradient></defs>
+<path class="gauge-track" d="M 25 105 A 80 80 0 0 1 185 105"/>
+<path class="gauge-progress" id="ramGaugeArc" d="M 25 105 A 80 80 0 0 1 185 105" style="stroke:url(#ramGradient)"/>
+<g id="ramGaugeNeedle" class="gauge-needle" transform="rotate(-90 105 105)"><line x1="105" y1="105" x2="105" y2="39"/></g>
+<circle class="gauge-center-dot" cx="105" cy="105" r="7"/><text class="gauge-scale" x="19" y="121">0</text><text class="gauge-scale" x="101" y="18">50</text><text class="gauge-scale" x="181" y="121">100</text>
+</svg><div class="gauge-readout"><strong id="ramGaugeValue">—</strong><span>memoria utilizada</span></div></div></div>
+  <div class="storage-note"><div><span>Utilizada</span><strong id="ramUsed">—</strong></div><div><span>Disponible</span><strong id="ramFree">—</strong></div><div><span>Total</span><strong id="ramTotal">—</strong></div><div><span>Origen</span><strong id="ramSource">—</strong></div></div>
+ </article>
+ <article class="server-card storage">
+  <div class="server-card-head"><div><strong>Almacenamiento</strong><small>Volumen /kaggle/working</small></div><div class="server-value" id="diskTopValue">—</div></div>
+  <div class="storage-list"><div class="storage-row"><div class="storage-row-top"><span>Espacio utilizado</span><strong id="diskUsedText">—</strong></div><div class="storage-track" role="meter" id="diskMeter" aria-label="Uso de disco" aria-valuemin="0" aria-valuemax="100"><div class="storage-fill" id="diskFill"></div></div></div></div>
+  <div class="storage-note"><div><span>Utilizado</span><strong id="diskUsed">—</strong></div><div><span>Disponible</span><strong id="diskFree">—</strong></div><div><span>Volumen total</span><strong id="diskTotal">—</strong></div><div><span>Estado</span><strong id="diskStatus">—</strong></div></div>
+  <p class="metric-note" id="diskNote">Capacidad del filesystem (no cuota contractual de Kaggle).</p>
+ </article>
+ <article class="server-card gpu" hidden>
+  <div class="server-card-head"><div><strong>GPU NVIDIA</strong><small id="gpuName">Consultando acelerador…</small></div><div class="server-value" id="gpuTopValue">—</div></div>
+  <div class="gpu-monitor-body"><div class="telemetry-donut" id="gpuRing" role="meter" aria-label="Utilización GPU" aria-valuemin="0" aria-valuemax="100"><div class="donut-readout"><strong id="gpuPct">—</strong><small>uso GPU</small></div></div><div class="gpu-facts"><div><span>Memoria usada</span><strong id="gpuVram">—</strong></div><div><span>Memoria total</span><strong id="gpuVramTotal">—</strong></div><div><span>Temperatura</span><strong id="gpuTemp">—</strong></div><div><span>Dispositivos</span><strong id="gpuCount">—</strong></div></div></div>
+  <div class="gpu-selector" id="gpuDevices" aria-label="Elegir GPU"></div><p class="metric-note" id="gpuNote">Lectura directa con nvidia-smi.</p>
+ </article>
+ </div>
+ <p class="monitor-footnote" id="monitorNote">Muestreo sin datos simulados; los campos no disponibles mostrarán N/D.</p>
+</section>
+<div class="page-actions"><a href="/resources" class="action-link">Abrir monitor detallado →</a><a href="/projects" class="action-link">Gestionar proyectos →</a></div>
+{{else if eq .Page "resources"}}
+<div class="route-heading"><span class="eyebrow">INSTANCIA KAGGLE</span><h2>Monitorización técnica</h2><p>Información obtenida de CPU, memoria, disco y GPU; sin datos ficticios del tema.</p></div>
+
+<section class="card server-metrics" id="server-metrics-section" aria-labelledby="monitorTitle">
+ <div class="monitor-heading"><div><span class="eyebrow">MONITOR · AXOLOTL</span><h2 id="monitorTitle">Recursos de la instancia</h2><p>Lecturas reales cada 5 segundos. CPU y RAM del contenedor si cgroups están disponibles; volumen de trabajo de Kaggle.</p></div><span class="server-status" id="serverStatus">Consultando</span></div>
+ <div class="server-grid">
+ <article class="server-card cpu">
+  <div class="server-card-head"><div><strong>CPU</strong><small>Carga de procesamiento</small></div><div class="server-value" id="cpuTopValue">—</div></div>
+  <div class="gauge-layout"><div class="speed-gauge"><svg viewBox="0 0 210 125" role="img" aria-label="Uso de CPU">
+<defs><linearGradient id="cpuGradient" x1="0" x2="1"><stop offset="0%" stop-color="#fc779b"/><stop offset="75%" stop-color="#fcbdd5"/><stop offset="100%" stop-color="#d49af6"/></linearGradient></defs>
+<path class="gauge-track" d="M 25 105 A 80 80 0 0 1 185 105"/>
+<path class="gauge-progress" id="cpuGaugeArc" d="M 25 105 A 80 80 0 0 1 185 105" style="stroke:url(#cpuGradient)"/>
+<g id="cpuGaugeNeedle" class="gauge-needle" transform="rotate(-90 105 105)"><line x1="105" y1="105" x2="105" y2="39"/></g>
+<circle class="gauge-center-dot" cx="105" cy="105" r="7"/><text class="gauge-scale" x="19" y="121">0</text><text class="gauge-scale" x="101" y="18">50</text><text class="gauge-scale" x="181" y="121">100</text>
+</svg><div class="gauge-readout"><strong id="cpuGaugeValue">—</strong><span>carga CPU</span></div></div>
+   <div class="cpu-summary"><div class="cpu-mini-stat"><span>Origen</span><strong id="cpuSource">Consultando</strong></div><div class="cpu-mini-stat"><span>Capacidad</span><strong id="cpuCapacity">—</strong></div><div class="cpu-mini-stat"><span>Núcleos visibles</span><strong id="cpuCores">—</strong></div><div class="cpu-mini-stat"><span>Actualización</span><strong id="cpuRefresh">5 s</strong></div></div>
+  </div>
+ </article>
+ <article class="server-card ram">
+  <div class="server-card-head"><div><strong>RAM</strong><small>Memoria del contenedor</small></div><div class="server-value" id="ramTopValue">—</div></div>
+  <div class="gauge-layout ram-layout"><div class="speed-gauge"><svg viewBox="0 0 210 125" role="img" aria-label="Uso de memoria RAM">
+<defs><linearGradient id="ramGradient" x1="0" x2="1"><stop offset="0%" stop-color="#fc779b"/><stop offset="75%" stop-color="#fcbdd5"/><stop offset="100%" stop-color="#d49af6"/></linearGradient></defs>
+<path class="gauge-track" d="M 25 105 A 80 80 0 0 1 185 105"/>
+<path class="gauge-progress" id="ramGaugeArc" d="M 25 105 A 80 80 0 0 1 185 105" style="stroke:url(#ramGradient)"/>
+<g id="ramGaugeNeedle" class="gauge-needle" transform="rotate(-90 105 105)"><line x1="105" y1="105" x2="105" y2="39"/></g>
+<circle class="gauge-center-dot" cx="105" cy="105" r="7"/><text class="gauge-scale" x="19" y="121">0</text><text class="gauge-scale" x="101" y="18">50</text><text class="gauge-scale" x="181" y="121">100</text>
+</svg><div class="gauge-readout"><strong id="ramGaugeValue">—</strong><span>memoria utilizada</span></div></div></div>
+  <div class="storage-note"><div><span>Utilizada</span><strong id="ramUsed">—</strong></div><div><span>Disponible</span><strong id="ramFree">—</strong></div><div><span>Total</span><strong id="ramTotal">—</strong></div><div><span>Origen</span><strong id="ramSource">—</strong></div></div>
+ </article>
+ <article class="server-card storage">
+  <div class="server-card-head"><div><strong>Almacenamiento</strong><small>Volumen /kaggle/working</small></div><div class="server-value" id="diskTopValue">—</div></div>
+  <div class="storage-list"><div class="storage-row"><div class="storage-row-top"><span>Espacio utilizado</span><strong id="diskUsedText">—</strong></div><div class="storage-track" role="meter" id="diskMeter" aria-label="Uso de disco" aria-valuemin="0" aria-valuemax="100"><div class="storage-fill" id="diskFill"></div></div></div></div>
+  <div class="storage-note"><div><span>Utilizado</span><strong id="diskUsed">—</strong></div><div><span>Disponible</span><strong id="diskFree">—</strong></div><div><span>Volumen total</span><strong id="diskTotal">—</strong></div><div><span>Estado</span><strong id="diskStatus">—</strong></div></div>
+  <p class="metric-note" id="diskNote">Capacidad del filesystem (no cuota contractual de Kaggle).</p>
+ </article>
+ <article class="server-card gpu" hidden>
+  <div class="server-card-head"><div><strong>GPU NVIDIA</strong><small id="gpuName">Consultando acelerador…</small></div><div class="server-value" id="gpuTopValue">—</div></div>
+  <div class="gpu-monitor-body"><div class="telemetry-donut" id="gpuRing" role="meter" aria-label="Utilización GPU" aria-valuemin="0" aria-valuemax="100"><div class="donut-readout"><strong id="gpuPct">—</strong><small>uso GPU</small></div></div><div class="gpu-facts"><div><span>Memoria usada</span><strong id="gpuVram">—</strong></div><div><span>Memoria total</span><strong id="gpuVramTotal">—</strong></div><div><span>Temperatura</span><strong id="gpuTemp">—</strong></div><div><span>Dispositivos</span><strong id="gpuCount">—</strong></div></div></div>
+  <div class="gpu-selector" id="gpuDevices" aria-label="Elegir GPU"></div><p class="metric-note" id="gpuNote">Lectura directa con nvidia-smi.</p>
+ </article>
+ </div>
+ <p class="monitor-footnote" id="monitorNote">Muestreo sin datos simulados; los campos no disponibles mostrarán N/D.</p>
+</section>
+{{else if eq .Page "integrations"}}
+<div class="route-heading"><span class="eyebrow">CONEXIONES</span><h2>GitHub y Hugging Face</h2></div><section class="standalone-section">
+        <article class="card section-card"><div class="card-head"><div><span class="card-kicker">CREDENCIALES</span><h3>Integraciones</h3></div><span class="mini-icon">⌁</span></div>
+        <p>Los tokens se validan, se mantienen en el proceso y se exponen a las herramientas autorizadas como variables de entorno. No se guardan en disco.</p>
+        <div class="integration-item"><div><strong>GitHub</strong><small>{{if .GitHubOn}}Token configurado{{else}}Conecta tu cuenta para operar repositorios{{end}}</small></div><span class="pill">{{if .GitHubOn}}Activo{{else}}Inactivo{{end}}</span></div>
+        <form method="post" action="/github" class="inline-token"><input type="hidden" name="csrf" value="{{.CSRF}}"><label for="githubToken">GITHUB_TOKEN</label><input id="githubToken" name="token" type="password" autocomplete="off" maxlength="4096" placeholder="github_pat_…"><button type="submit">Guardar</button></form>
+        <div class="integration-item"><div><strong>Hugging Face</strong><small>{{if .HFOn}}Token configurado{{else}}Conecta tu cuenta para usar el Hub{{end}}</small></div><span class="pill">{{if .HFOn}}Activo{{else}}Inactivo{{end}}</span></div>
+        <form method="post" action="/huggingface" class="inline-token"><input type="hidden" name="csrf" value="{{.CSRF}}"><label for="hfToken">HF_TOKEN</label><input id="hfToken" name="token" type="password" autocomplete="off" maxlength="4096" placeholder="hf_…"><button type="submit">Guardar</button></form>
+        <small class="muted">Envía el campo vacío para eliminar el token del proceso actual. Los cambios son temporales.</small>
+        </article>
+        </section>
+{{else if eq .Page "projects"}}
+<div class="route-heading"><span class="eyebrow">ESPACIO DE TRABAJO</span><h2>Proyectos y tareas</h2></div><section class="standalone-section"><article class="card section-card" id="projects"><div class="card-head"><div><span class="card-kicker">ORGANIZACIÓN</span><h3>Nuevo proyecto</h3></div><span class="mini-icon">▤</span></div>
+        <p>Centraliza los repositorios, cuadernos y decisiones del equipo.</p>
+        <form method="post" action="/project" class="project-form"><input type="hidden" name="csrf" value="{{.CSRF}}"><label>ID del proyecto<input name="id" pattern="[a-zA-Z0-9_-]+" maxlength="80" placeholder="mi-proyecto" required></label><label>Nombre<input name="name" maxlength="200" placeholder="Mi proyecto Kaggle" required></label><label>Repositorio GitHub<input name="repository" placeholder="usuario/repositorio"></label><label>Notebook<input name="notebook" placeholder="notebooks/proyecto.ipynb"></label><button type="submit" class="action-primary">Crear proyecto →</button></form>
+        </article>
+      </section>
+<section class="projects-section" aria-label="Proyectos guardados">
+      {{range .Projects}}{{$project := .ID}}
+        <article class="card project-card"><div class="card-head"><div><span class="card-kicker">PROYECTO · {{.ID}}</span><h3>{{.Name}}</h3></div>{{if .Verification}}<span class="pill">Verificado</span>{{else}}<span class="pill">Pendiente</span>{{end}}</div>
+        <p>Repositorio: {{.Repository}} · Notebook: {{.Notebook}}</p>
+        <div class="project-actions"><form action="/export" method="post"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{.ID}}"><button>Exportar contexto</button></form><form action="/import" method="post"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{.ID}}"><button>Restaurar contexto</button></form></div>
+        <div class="project-columns"><div><h4>Memoria</h4>{{range .Memory}}<p class="entry">{{.}}</p>{{else}}<p class="muted">Sin notas todavía.</p>{{end}}<form action="/memory" method="post"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{.ID}}"><textarea name="text" placeholder="Guardar decisión o contexto..." maxlength="6000" required></textarea><button>Guardar nota</button></form></div><div><h4>Tareas</h4>{{range .Tasks}}<div class="task-row"><div><strong>{{.Title}}</strong><small>{{.Status}}</small></div><form method="post" action="/task-status"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{$project}}"><input type="hidden" name="task" value="{{.ID}}"><select name="status"><option value="pending">Pendiente</option><option value="in_progress">En progreso</option><option value="done">Completa</option></select><button>✓</button></form></div>{{else}}<p class="muted">No hay tareas.</p>{{end}}<form method="post" action="/task"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="project" value="{{.ID}}"><input name="title" maxlength="300" placeholder="Nueva tarea" required><button>Añadir tarea</button></form></div></div></article>
+      {{else}}<div class="empty-projects card">◇ Aún no hay proyectos registrados. Crea el primero desde el formulario.</div>{{end}}
+      </section>
+
+
+{{else if eq .Page "agents"}}
+<div class="route-heading"><span class="eyebrow">ORQUESTADOR · OPCIONAL</span><h2>Delegación entre chats</h2>
+ <p>Cada subagente recibe un MCP y una ruta exactos. No se abre otro chat ni se delega nada sin tu confirmación.</p>
+</div>
+<section class="card section-card agent-consent">
+ <div class="card-head"><div><span class="card-kicker">CONTROL HUMANO</span><h3>¿Quieres utilizar un subagente para esta tarea?</h3></div><span class="pill">Opcional</span></div>
+ <p>Si eliges No, no se crea ninguna tarea. Elegir Sí solo permite preparar una asignación; no inicia ejecución automática. Las rutas son límites de trabajo en el prompt, no permisos de sistema operativo.</p>
+ {{if not .AgentCurrent}}
+ <div class="agent-choice"><a href="/dashboard" class="action-link">No, volver al panel</a>
+ <details class="agent-setup"><summary class="agent-button">Sí, preparar delegación</summary>
+ <form method="post" action="/agent-create" class="agent-form">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <label>Título<input name="title" required maxlength="150" placeholder="Implementar API de auditoría"></label>
+  <label>Conector MCP de trabajo<input name="mcp" required maxlength="200" placeholder="$pl0 (nombre literal, ejemplo)"></label>
+  <label>ID de instancia MCP (opcional)<input name="mcp_id" maxlength="200" placeholder="app://... o identificador registrado"></label>
+  <label>Directorio absoluto del proyecto<input name="workspace" required maxlength="300" placeholder="/kaggle/working/proyecto"></label>
+  <label>Rama Git aislada<input name="branch" required maxlength="160" placeholder="agent/task-api-auditoria"></label>
+  <label class="wide">Objetivo<textarea name="objective" required maxlength="3500" rows="3" placeholder="Resultado preciso que debe construir el subagente"></textarea></label>
+  <label class="wide">Contexto mínimo<textarea name="context" required maxlength="3500" rows="3" placeholder="Arquitectura, decisiones y dependencias relevantes (sin secretos)"></textarea></label>
+  <label class="wide">Rutas permitidas (relativas al proyecto; separadas por espacios)<input name="allowed_paths" required placeholder="internal/api/ internal/db/"></label>
+  <label class="wide">Criterios de aceptación<textarea name="criteria" required maxlength="2500" rows="3" placeholder="Pruebas necesarias, contratos y comportamiento esperado"></textarea></label>
+  <label class="wide agent-check"><input type="checkbox" name="user_approved" value="yes" required><span>Confirmo que deseo delegar esta tarea concreta. He verificado el conector y la ruta; puedo revocar el trabajo deteniéndolo en el otro chat.</span></label>
+  <button type="submit" class="action-primary">Crear asignación y generar prompt →</button>
+ </form></details></div>
+ {{else}}
+  <div class="agent-prompt-ready"><strong>Asignación {{.AgentCurrent.ID}} creada</strong>
+   <p>Conecta el mismo MCP coordinador y el MCP de trabajo en el segundo chat. Comprueba manualmente la ruta antes de comenzar.</p>
+   <label for="agentPrompt">Prompt para el segundo chat</label>
+   <textarea id="agentPrompt" readonly rows="14">{{.AgentPrompt}}</textarea>
+   <button type="button" id="copyAgentPrompt" class="action-primary">Copiar prompt</button>
+  </div>
+ {{end}}
+</section>
+<section class="card section-card agent-board" aria-labelledby="agentBoardHeading">
+ <div class="card-head"><div><span class="card-kicker">SEGUIMIENTO</span><h3 id="agentBoardHeading">Tareas delegadas</h3></div><small>Guardadas en KagMCP</small></div>
+ {{range .AgentList}}
+ <article class="agent-task">
+  <div class="agent-task-top"><div><strong>{{.Title}}</strong><small>{{.ID}} · {{.MCP}} · {{.Workspace}}</small></div><span class="pill">{{.Status}}</span></div>
+  <p>{{.Objective}}</p><div class="agent-meta"><span>Rama: <code>{{.Branch}}</code></span><span>Agente: {{if .Agent}}{{.Agent}}{{else}}Sin asignar{{end}}</span></div>
+  {{if .Summary}}<p><strong>Entrega:</strong> {{.Summary}}</p>{{end}}
+  {{if .Tests}}<p><strong>Pruebas:</strong> {{.Tests}}</p>{{end}}
+  {{if .Commit}}<p><strong>Commit:</strong> <code>{{.Commit}}</code></p>{{end}}
+  {{if .Blocker}}<p><strong>Bloqueo:</strong> {{.Blocker}}</p>{{end}}
+  {{if .Review}}<p><strong>Revisión:</strong> {{.Review}}</p>{{end}}
+  <a class="agent-task-link" href="/agents?created={{.ID}}">Ver prompt / contexto</a>
+  {{if ne .Status "approved"}}{{if ne .Status "cancelled"}}
+  <details class="agent-cancel">
+   <summary>Cancelar asignación</summary>
+   <form action="/agent-cancel" method="post">
+    <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}">
+    <label>Motivo de cancelación<input name="note" maxlength="1000" placeholder="La tarea ya no se necesita" required></label>
+    <button type="submit">Confirmar cancelación</button>
+   </form>
+   <small>Cancelar en KagMCP impide nuevas entregas; no detiene automáticamente otro chat o comando en ejecución.</small>
+  </details>
+  {{end}}{{end}}
+  {{if eq .Status "needs_review"}}
+  <form action="/agent-review" method="post" class="agent-review-form">
+   <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}">
+   <label>Conclusión de revisión<textarea name="note" required maxlength="2500" placeholder="Revisé commit y pruebas; decisión motivada"></textarea></label>
+   <div class="agent-review-actions"><button type="submit" name="decision" value="approved" class="action-primary">Aprobar entrega</button><button type="submit" name="decision" value="rejected">Rechazar y devolver</button></div>
+  </form>{{end}}
+ </article>
+ {{else}}<p class="muted">Todavía no se ha delegado ninguna tarea. Es opcional.</p>{{end}}
+</section>
+
+{{else if eq .Page "activity"}}
+<div class="route-heading"><span class="eyebrow">AUDITORÍA</span><h2>Actividad reciente</h2></div><section class="card section-card history-card" id="history">
+  <div class="card-head">
+    <div><span class="card-kicker">AUDITORÍA</span><h3>Historial de comandos</h3></div>
+    <span class="activity-live" id="activityLiveStatus" role="status" aria-live="polite">Sincronizando…</span>
+  </div>
+  <p>Se actualiza automáticamente cada 5 segundos. Página 1 = registros más recientes. Se conservan hasta 1,000 eventos.</p>
+  <div class="activity-summary">
+    <strong id="activityTotal">{{.Activity.Total}} registros</strong>
+    <span id="activityChecked">Última consulta al abrir la página</span>
+  </div>
+  <div id="activityEntries" class="activity-entries" aria-label="Eventos auditados">
+  {{range .Activity.Items}}
+    <article class="history-entry">
+      <span class="pill">{{.Status}}</span>
+      <div><strong>{{.Description}}</strong>
+        <small><time datetime="{{.When.Format "2006-01-02T15:04:05Z07:00"}}">{{.When.Format "2006-01-02 15:04:05"}} UTC</time> · {{.Project}}</small>
+        {{if .Command}}<pre>{{.Command}}</pre>{{end}}
+      </div>
+    </article>
+  {{else}}<p class="muted activity-empty">Todavía no hay eventos registrados.</p>{{end}}
+  </div>
+  <nav class="activity-pagination" id="activityPagination" aria-label="Páginas de actividad">
+    {{if .Activity.HasPrev}}<a class="activity-page" href="/activity?page={{.Activity.PrevPage}}" rel="prev">← Anterior</a>{{end}}
+    {{range .Activity.PageNumbers}}
+      <a class="activity-page {{if eq . $.Activity.Page}}current{{end}}" href="/activity?page={{.}}" {{if eq . $.Activity.Page}}aria-current="page"{{end}}>{{.}}</a>
+    {{end}}
+    {{if .Activity.HasNext}}<a class="activity-page" href="/activity?page={{.Activity.NextPage}}" rel="next">Siguiente →</a>{{end}}
+  </nav>
+  <p class="activity-page-info" id="activityPageInfo">Página {{.Activity.Page}} de {{.Activity.TotalPages}} · Orden: más reciente primero</p>
+</section>
+
+{{else if eq .Page "skills"}}
+<div class="route-heading"><span class="eyebrow">AGENTES</span><h2>Skills disponibles</h2></div><section class="standalone-section">
+        <article class="card section-card" id="skills"><div class="card-head"><div><span class="card-kicker">HERRAMIENTAS</span><h3>Skills disponibles</h3></div></div><p>Ponytail v2 permanece activa en los proyectos.</p>
+          {{range .SkillList}}<a class="skill-entry" href="/skills?name={{.Name}}"><strong>{{.Name}}</strong>{{if .AlwaysActive}}<span class="pill">Activa</span>{{end}}<small>{{.Description}}</small></a>{{end}}
+          {{if .SkillName}}<h4>{{.SkillName}}</h4><pre>{{.SkillContent}}</pre>{{if .NextOffset}}<a href="/skills?name={{.SkillName}}&amp;offset={{.NextOffset}}">Ver siguiente fragmento →</a>{{end}}{{end}}
+        </article>
+        </section>
+{{else if eq .Page "security"}}
+<div class="route-heading"><span class="eyebrow">ACCESO</span><h2>Seguridad y sesión</h2></div><section class="standalone-section"><article class="card section-card" id="security"><div class="card-head"><div><span class="card-kicker">CUENTA</span><h3>Seguridad del panel</h3></div></div><p>El PIN protege el acceso y las conexiones autorizadas. La sesión se conserva hasta 7 días en el mismo dominio HTTPS, incluso tras reiniciar el proceso. Cambiar el PIN revoca las sesiones y autorizaciones OAuth. Si el túnel cambia de dominio, tendrás que iniciar sesión otra vez.</p>
+          <form method="post" action="/change-pin" class="security-form"><input type="hidden" name="csrf" value="{{.CSRF}}"><label>PIN actual<input type="password" name="current_pin" autocomplete="current-password" maxlength="128" required></label><label>Nuevo PIN<input type="password" name="new_pin" autocomplete="new-password" minlength="6" maxlength="128" required></label><button type="submit" class="action-primary">Actualizar PIN y cerrar sesiones</button></form>
+        </article>
+      </section>
+{{end}}
+<footer>Datos del runtime: /kaggle/working/.kagmcp · Guarda tu contexto en Git antes de finalizar la sesión.</footer>
+    </div>
+  </main>
+</div>
+{{end}}
+</body></html>

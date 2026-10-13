@@ -1,0 +1,37 @@
+name: Validación Go Linux
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+      - name: Confirmar Go con parches de seguridad
+        run: go version
+      - name: Validar notebook Kaggle (JSON y sintaxis Python)
+        run: python3 scripts/check_notebook.py
+      - name: Validar visibilidad dinámica de GPU
+        run: node scripts/test_gpu_visibility.cjs
+      - name: Pruebas MCP OAuth y GitHub
+        run: go test -timeout 90s ./...
+      - name: Análisis estático
+        run: go vet ./...
+      - name: Auditoría de vulnerabilidades
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+      - name: Compilación estática
+        run: CGO_ENABLED=0 go build -buildvcs=false -trimpath -ldflags="-s -w" -o kagmcp ./cmd/kagssh
+      - name: Comprobar enlazado
+        run: |
+          file kagmcp
+          ! readelf -l kagmcp | grep -q INTERP
