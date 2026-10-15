@@ -33,6 +33,15 @@ if 'REPO_DIR = WORKING / "kaggle-mcp"' not in clone_source:
 if "kagssh-go" in clone_source:
     raise SystemExit("La celda de clonación todavía contiene el nombre anterior.")
 
+build_source = "".join(next(c for c in data["cells"] if c["id"] == "compilar")["source"])
+if '"./cmd/kagmcp"' not in build_source or '"./cmd/kagssh"' in build_source:
+    raise SystemExit("El notebook debe compilar ./cmd/kagmcp.")
+
+# Los workflows GitHub existentes todavía compilan el alias histórico.
+legacy_command = notebook.parents[1] / "cmd" / "kagssh"
+if not legacy_command.is_symlink() or legacy_command.readlink() != Path("kagmcp"):
+    raise SystemExit("Falta el alias compatible cmd/kagssh -> kagmcp.")
+
 # Prueba de comportamiento: compilar sintácticamente la celda no detecta
 # expresiones regulares válidas que nunca coinciden (error anterior \\s / \\d).
 install_cell = next(c for c in data["cells"] if c["id"] == "instalar-go")
@@ -83,9 +92,9 @@ def has_call(name, attr):
         and node.func.value.id == name and node.func.attr == attr
         for node in calls
     )
-if not has_call("subprocess", "Popen") or not has_call("kagssh", "wait"):
+if not has_call("subprocess", "Popen") or not has_call("kagmcp", "wait"):
     raise SystemExit("La celda debe lanzar Go con Popen y esperar su terminación (espera bloqueante).")
-if not all(has_call("kagssh", name) for name in ("poll", "terminate", "kill")):
+if not all(has_call("kagmcp", name) for name in ("poll", "terminate", "kill")):
     raise SystemExit("Falta limpieza del proceso al interrumpir la celda.")
 if not any(isinstance(node, ast.ExceptHandler) and isinstance(node.type, ast.Name)
            and node.type.id == "KeyboardInterrupt" for node in ast.walk(run_tree)):
@@ -97,7 +106,7 @@ if any(value in run_source for value in (
     raise SystemExit("La celda no puede desacoplar el proceso ni capturar/ocultar logs.")
 if ("stdout=subprocess.PIPE" not in run_source
         or "stderr=subprocess.STDOUT" not in run_source
-        or 'for line in kagssh.stdout:' not in run_source
+        or 'for line in kagmcp.stdout:' not in run_source
         or 'print(line, end="", flush=True)' not in run_source):
     raise SystemExit("Los logs deben imprimirse línea por línea en la celda, sin hilos.")
 if any(c["id"] in {"estado", "cierre", "stop"} for c in data["cells"]):

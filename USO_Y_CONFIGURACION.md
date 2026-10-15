@@ -59,7 +59,7 @@ Activa `USE_GITHUB` o `USE_HUGGINGFACE` para introducir los tokens mediante `get
 ```bash
 go test ./...
 go vet ./...
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -trimpath -o kagmcp-linux-amd64 ./cmd/kagssh
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -trimpath -o kagmcp-linux-amd64 ./cmd/kagmcp
 ```
 
 El módulo Go y la ruta actual de GitHub conservan su identificador histórico para no romper importaciones y flujos de compilación.

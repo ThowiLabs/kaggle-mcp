@@ -44,10 +44,10 @@ Desde la raíz del repositorio:
 ```bash
 go test ./...
 go vet ./...
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -trimpath -o kagmcp-linux-amd64 ./cmd/kagssh
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -trimpath -o kagmcp-linux-amd64 ./cmd/kagmcp
 ```
 
-El repositorio y el notebook usan ahora **Kaggle MCP**. La ruta interna `./cmd/kagssh`, los ejecutables `kagmcp-*` y las variables `KAGMCP_*` se conservan por compatibilidad.
+El comando principal está en `./cmd/kagmcp`. Se mantiene `./cmd/kagssh` únicamente como enlace de compatibilidad para compilaciones antiguas y workflows existentes. Los ejecutables `kagmcp-*` y las variables `KAGMCP_*` no cambian.
 
 Consulta [USO_Y_CONFIGURACION.md](USO_Y_CONFIGURACION.md) para instrucciones detalladas, [GITHUB_CAPACIDADES.md](GITHUB_CAPACIDADES.md) para las herramientas GitHub, [AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md) para delegación, y [RELEASES.md](RELEASES.md) para distribución.
 

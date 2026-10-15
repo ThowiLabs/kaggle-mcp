@@ -8,7 +8,7 @@ Renombrar `ThowiLabs/kagssh-go` a `ThowiLabs/kaggle-mcp` y actualizar el noteboo
 - Dirección GitHub renombrada y confirmada: `https://github.com/ThowiLabs/kaggle-mcp`.
 - Módulo Go e importaciones internas: `github.com/ThowiLabs/kaggle-mcp`.
 - Notebook nuevo: `notebooks/kaggle_mcp.ipynb`; clona `/kaggle/working/kaggle-mcp` desde el nuevo repositorio.
-- Se conserva `./cmd/kagssh`, el prefijo de ejecutables `kagmcp-*`, las variables `KAGMCP_*` y el estado `.kagmcp` por compatibilidad con instalaciones anteriores.
+- El cambio posterior a `./cmd/kagmcp` dejó `./cmd/kagssh` como enlace simbólico para workflows heredados; el prefijo de ejecutables `kagmcp-*`, las variables `KAGMCP_*` y el estado `.kagmcp` se conservan por compatibilidad.
 - Los registros históricos de `contexto/` y `tareas/` se mantienen intactos salvo actualización del estado inicial vigente.
 
 ## Arquitectura actual

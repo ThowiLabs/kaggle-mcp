@@ -5,14 +5,14 @@
 Mantener Kaggle MCP como servidor Model Context Protocol para sesiones autorizadas de Kaggle.
 
 # Decisiones tomadas
-- Nombre público: Kaggle MCP; se conserva identificador del módulo Go y ruta del repositorio para compatibilidad.
+- Nombre público: Kaggle MCP; módulo Go `github.com/ThowiLabs/kaggle-mcp` y comando principal `cmd/kagmcp`.
 - Servidor MCP mediante HTTPS (Gradio, respaldo Cloudflare o proxy propio), OAuth y PIN.
 - Panel web para proyectos, memoria, tareas, actividad, métricas, Skills e integraciones.
 - Herramientas MCP autorizadas para las operaciones del runtime..
 - Los tokens se mantienen en memoria o mediante controles de integración privados.
 
 # Arquitectura actual
-- cmd/kagssh/main.go: inicializa el servidor MCP.
+- cmd/kagmcp/main.go: inicializa el servidor MCP. `cmd/kagssh` es un enlace de compatibilidad para workflows existentes.
 - internal/config: parámetros MCP y preferencias no sensibles.
 - internal/mcp: protocolo, herramientas, integraciones y enlaces temporales.
 - internal/dashboard: interfaz administrativa.
