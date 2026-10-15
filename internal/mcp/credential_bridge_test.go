@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ThowiLabs/kagssh-go/internal/config"
-	"github.com/ThowiLabs/kagssh-go/internal/githubtoken"
+	"github.com/ThowiLabs/kaggle-mcp/internal/config"
+	"github.com/ThowiLabs/kaggle-mcp/internal/githubtoken"
 )
 
 func TestCredentialBridgePrivateSocketAndGitHelper(t *testing.T) {

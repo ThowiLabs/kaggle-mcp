@@ -283,7 +283,7 @@ func (s *Store) Submit(id, agent, status, commit, tests, summary, blocker string
 	})
 }
 
-// Cancel blocks future claims or submissions in KagMCP. It cannot remotely
+// Cancel blocks future claims or submissions in Kaggle MCP. It cannot remotely
 // terminate an already-running ChatGPT chat or an external MCP command.
 func (s *Store) Cancel(id, note string) (Task, error) {
 	if !cleanText(note, 1000) {
@@ -329,7 +329,7 @@ func Prompt(t Task) string {
 		"",
 		"Comprueba que tienes acceso REAL al MCP, al directorio y a la rama indicada. Si no coinciden, DETENTE y reporta bloqueo.",
 		"Usa únicamente ese conector para esta tarea. No cambies de entorno sin nueva autorización.",
-		"El MCP coordinador es KagMCP (la instancia en la que se creó "+t.ID+"). Conecta también ese MCP para registrar tu progreso. No presupongas que el MCP de trabajo tiene herramientas agent_task_*.",
+		"El MCP coordinador es Kaggle MCP (la instancia en la que se creó "+t.ID+"). Conecta también ese MCP para registrar tu progreso. No presupongas que el MCP de trabajo tiene herramientas agent_task_*.",
 		"En el MCP coordinador llama agent_task_open con id="+t.ID+" y un identificador estable de agente. Si no está conectado, continúa solamente con estas instrucciones y pide al usuario conectar el coordinador para reportar.",
 		"En el MCP de trabajo usa exclusivamente el conector "+t.MCP+".",
 		"Objetivo: "+t.Objective,

@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ThowiLabs/kagssh-go/internal/githubtoken"
+	"github.com/ThowiLabs/kaggle-mcp/internal/githubtoken"
 )
 
 var githubExtendedNames = map[string]bool{

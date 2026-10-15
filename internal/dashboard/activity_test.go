@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ThowiLabs/kagssh-go/internal/projectstate"
+	"github.com/ThowiLabs/kaggle-mcp/internal/projectstate"
 )
 
 func TestActivityLiveAndPrivatePagination(t *testing.T) {

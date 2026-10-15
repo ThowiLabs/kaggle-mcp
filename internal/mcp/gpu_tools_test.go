@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ThowiLabs/kagssh-go/internal/gpumetrics"
+	"github.com/ThowiLabs/kaggle-mcp/internal/gpumetrics"
 )
 
 type fakeGPU struct{ queries []string }

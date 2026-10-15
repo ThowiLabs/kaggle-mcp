@@ -1,6 +1,6 @@
-# KagMCP — Model Context Protocol para Kaggle
+# Kaggle MCP — Model Context Protocol para Kaggle
 
-KagMCP es un servidor **MCP no oficial** para conectar ChatGPT y otros clientes compatibles con una sesión autorizada de Kaggle. Su núcleo es un binario Go para Linux, con transporte HTTPS, OAuth, PIN de administración y panel web. No requiere GPU.
+Kaggle MCP es un servidor **MCP no oficial** para conectar ChatGPT y otros clientes compatibles con una sesión autorizada de Kaggle. Su núcleo es un binario Go para Linux, con transporte HTTPS, OAuth, PIN de administración y panel web. No requiere GPU.
 
 ## Funcionalidades principales
 
@@ -15,7 +15,7 @@ La herramienta MCP `exec` puede ejecutar operaciones autorizadas en el runtime. 
 
 ## Uso rápido en Kaggle
 
-1. Abre [el notebook del proyecto](notebooks/kagssh_kaggle_chatgpt_agentes.ipynb) en Kaggle y activa Internet.
+1. Abre [el notebook del proyecto](notebooks/kaggle_mcp.ipynb) en Kaggle y activa Internet.
 2. Ejecuta las celdas para clonar/actualizar, instalar la versión adecuada de Go y compilar.
 3. Configura `MCP_ENABLED=True`, `MCP_TUNNEL="auto"` y `pin=""` para que Go genere un PIN temporal.
 4. Ejecuta las celdas de validación e inicio. Copia el enlace HTTPS terminado en `/mcp` a tu cliente y sigue el flujo de autorización.
@@ -47,7 +47,7 @@ go vet ./...
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -trimpath -o kagmcp-linux-amd64 ./cmd/kagssh
 ```
 
-El nombre histórico del directorio y la ruta `./cmd/kagssh` se conservan para mantener compatibilidad con el repositorio remoto existente; el producto y su función pública son **KagMCP**.
+El repositorio y el notebook usan ahora **Kaggle MCP**. La ruta interna `./cmd/kagssh`, los ejecutables `kagmcp-*` y las variables `KAGMCP_*` se conservan por compatibilidad.
 
 Consulta [USO_Y_CONFIGURACION.md](USO_Y_CONFIGURACION.md) para instrucciones detalladas, [GITHUB_CAPACIDADES.md](GITHUB_CAPACIDADES.md) para las herramientas GitHub, [AGENT_ORCHESTRATOR.md](AGENT_ORCHESTRATOR.md) para delegación, y [RELEASES.md](RELEASES.md) para distribución.
 
@@ -57,6 +57,6 @@ Consulta [USO_Y_CONFIGURACION.md](USO_Y_CONFIGURACION.md) para instrucciones det
 - `/kaggle/input` es solo lectura; `/kaggle/working` contiene archivos modificables.
 - El runtime es compartido: las herramientas concedidas tienen los permisos del proceso y deben usarse con cautela.
 - Revisa los permisos del PAT y revócalo si se filtra. No compartas el PIN ni las URLs de descarga temporal.
-- KagMCP es un proyecto independiente, no oficial de Kaggle, OpenAI, Gradio o GitHub.
+- Kaggle MCP es un proyecto independiente, no oficial de Kaggle, OpenAI, Gradio o GitHub.
 
-Repositorio actual: [ThowiLabs/kagssh-go](https://github.com/ThowiLabs/kagssh-go).
+Repositorio: [ThowiLabs/kaggle-mcp](https://github.com/ThowiLabs/kaggle-mcp).

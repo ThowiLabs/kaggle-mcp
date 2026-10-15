@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/ThowiLabs/kagssh-go/internal/agenttasks"
+	"github.com/ThowiLabs/kaggle-mcp/internal/agenttasks"
 )
 
 func agentTool(name string) bool {

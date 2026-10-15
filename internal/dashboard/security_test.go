@@ -1,9 +1,9 @@
 package dashboard
 
 import (
-	"github.com/ThowiLabs/kagssh-go/internal/pinauth"
-	"github.com/ThowiLabs/kagssh-go/internal/projectstate"
-	"github.com/ThowiLabs/kagssh-go/internal/skills"
+	"github.com/ThowiLabs/kaggle-mcp/internal/pinauth"
+	"github.com/ThowiLabs/kaggle-mcp/internal/projectstate"
+	"github.com/ThowiLabs/kaggle-mcp/internal/skills"
 	"net/http"
 	"net/http/httptest"
 	"net/url"

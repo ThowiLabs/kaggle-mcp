@@ -1,4 +1,4 @@
-/* Adaptación de Axolotl Dashboard a KagMCP: componentes nativos y responsive. */
+/* Adaptación de Axolotl Dashboard a Kaggle MCP: componentes nativos y responsive. */
 :root{--primary:#fc779b;--secondary:#fcbdd5;--body-bg:#09070b}
 body{overflow-x:hidden}
 .app{min-height:100vh}

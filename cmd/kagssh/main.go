@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ThowiLabs/kagssh-go/internal/config"
-	"github.com/ThowiLabs/kagssh-go/internal/mcp"
+	"github.com/ThowiLabs/kaggle-mcp/internal/config"
+	"github.com/ThowiLabs/kaggle-mcp/internal/mcp"
 )
 
 var version = "dev"
@@ -46,16 +46,16 @@ func main() {
 		os.Exit(2)
 	}
 	if *check {
-		fmt.Println("configuración válida para KagMCP")
+		fmt.Println("configuración válida para Kaggle MCP")
 		return
 	}
 	if err := config.SaveSettings(cfg); err != nil {
-		fmt.Fprintln(os.Stderr, "guardar preferencias KagMCP:", err)
+		fmt.Fprintln(os.Stderr, "guardar preferencias Kaggle MCP:", err)
 		os.Exit(1)
 	}
 	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	if os.Geteuid() == 0 {
-		log.Warn("KagMCP corre como root: las herramientas autorizadas tendrán privilegios del proceso")
+		log.Warn("Kaggle MCP corre como root: las herramientas autorizadas tendrán privilegios del proceso")
 	}
 	results := make(chan error, 1)
 	go func() { results <- mcp.Run(ctx, cfg, log) }()
@@ -66,7 +66,7 @@ func main() {
 		completed = true
 		if err != nil && !errors.Is(err, context.Canceled) {
 			failed = true
-			log.Error("servicio KagMCP terminó con error", "error", err)
+			log.Error("servicio Kaggle MCP terminó con error", "error", err)
 		}
 	case <-ctx.Done():
 	}
@@ -80,7 +80,7 @@ func main() {
 			log.Warn("tiempo de cierre agotado; terminando proceso")
 		}
 	}
-	log.Info("KagMCP detenido")
+	log.Info("Kaggle MCP detenido")
 	if failed {
 		os.Exit(1)
 	}

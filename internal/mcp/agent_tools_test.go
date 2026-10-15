@@ -3,7 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
-	"github.com/ThowiLabs/kagssh-go/internal/agenttasks"
+	"github.com/ThowiLabs/kaggle-mcp/internal/agenttasks"
 	"strings"
 	"testing"
 )

@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/ThowiLabs/kagssh-go/internal/projectstate"
+	"github.com/ThowiLabs/kaggle-mcp/internal/projectstate"
 	"os"
 	"os/exec"
 	"path/filepath"

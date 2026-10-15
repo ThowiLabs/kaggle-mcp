@@ -4,7 +4,7 @@ import json
 import re
 from pathlib import Path
 
-notebook = Path(__file__).resolve().parents[1] / "notebooks" / "kagssh_kaggle_chatgpt_agentes.ipynb"
+notebook = Path(__file__).resolve().parents[1] / "notebooks" / "kaggle_mcp.ipynb"
 data = json.loads(notebook.read_text(encoding="utf-8"))
 if data.get("nbformat") != 4:
     raise SystemExit("Formato .ipynb incompatible: se esperaba nbformat 4.")
@@ -23,6 +23,15 @@ for index, cell in enumerate(data["cells"], start=1):
 required = {"clonar", "instalar-go", "compilar", "configurar", "validacion", "run"}
 if missing := required - ids:
     raise SystemExit(f"Celdas faltantes: {sorted(missing)}")
+
+# El notebook debe clonar el repositorio renombrado en un directorio independiente.
+clone_source = "".join(next(c for c in data["cells"] if c["id"] == "clonar")["source"])
+if 'REPO_URL = "https://github.com/ThowiLabs/kaggle-mcp.git"' not in clone_source:
+    raise SystemExit("La celda de clonación no apunta al repositorio Kaggle MCP.")
+if 'REPO_DIR = WORKING / "kaggle-mcp"' not in clone_source:
+    raise SystemExit("La celda de clonación usa un directorio distinto al esperado.")
+if "kagssh-go" in clone_source:
+    raise SystemExit("La celda de clonación todavía contiene el nombre anterior.")
 
 # Prueba de comportamiento: compilar sintácticamente la celda no detecta
 # expresiones regulares válidas que nunca coinciden (error anterior \\s / \\d).
@@ -105,7 +114,7 @@ import os
 
 config_source = "".join(next(c for c in data["cells"] if c["id"] == "configurar")["source"])
 test_pat = "TEST_ONLY_GITHUB_PAT"
-local = {"WORKING": Path("/kaggle/working"), "REPO_DIR": Path("/kaggle/working/kagssh-go")}
+local = {"WORKING": Path("/kaggle/working"), "REPO_DIR": Path("/kaggle/working/kaggle-mcp")}
 output = io.StringIO()
 with patch.dict(os.environ, {
     "KAGGLE_USER_SECRETS_TOKEN": "TEST_ONLY_INTERNAL",
@@ -124,14 +133,14 @@ if env.get("MCP_ACCESS_PIN") != "":
 
 custom_source = config_source.replace('pin = ""', 'pin = "ABCDEF"')
 with patch.dict(os.environ, {}, clear=True), contextlib.redirect_stdout(io.StringIO()):
-    custom = {"WORKING": Path("/kaggle/working"), "REPO_DIR": Path("/kaggle/working/kagssh-go")}
+    custom = {"WORKING": Path("/kaggle/working"), "REPO_DIR": Path("/kaggle/working/kaggle-mcp")}
     exec(compile(custom_source, "celda-configurar", "exec"), custom)
 if custom["RUNTIME_ENV"]["MCP_ACCESS_PIN"] != "ABCDEF":
     raise SystemExit("El PIN explícito no se transmite al binario.")
 
 github_source = config_source.replace("USE_GITHUB = False", "USE_GITHUB = True")
 with patch.dict(os.environ, {}, clear=True), patch.object(getpass, "getpass", return_value=test_pat), contextlib.redirect_stdout(io.StringIO()):
-    github = {"WORKING": Path("/kaggle/working"), "REPO_DIR": Path("/kaggle/working/kagssh-go")}
+    github = {"WORKING": Path("/kaggle/working"), "REPO_DIR": Path("/kaggle/working/kaggle-mcp")}
     exec(compile(github_source, "celda-configurar", "exec"), github)
 if github["RUNTIME_ENV"].get("GITHUB_TOKEN") != test_pat:
     raise SystemExit("La integración GitHub no obtiene el PAT mediante getpass.")

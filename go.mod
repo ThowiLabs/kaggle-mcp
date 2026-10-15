@@ -1,4 +1,4 @@
-module github.com/ThowiLabs/kagssh-go
+module github.com/ThowiLabs/kaggle-mcp
 
 go 1.26.9
 

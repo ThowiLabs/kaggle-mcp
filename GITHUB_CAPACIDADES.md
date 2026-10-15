@@ -1,6 +1,6 @@
-# GitHub avanzado en KagMCP — repositorios, tags, Actions y archivos
+# GitHub avanzado en Kaggle MCP — repositorios, tags, Actions y archivos
 
-KagMCP dispone de `github_api` (REST genérica) y `github_graphql` (GraphQL), además de herramientas de alto nivel. **No es una cuenta GitHub ilimitada:** el servidor usa el PAT configurado, las políticas de ramas, el plan de GitHub y sus permisos. Todas las operaciones remotas se ejecutan desde el MCP conectado (no desde el chat sin conector).
+Kaggle MCP dispone de `github_api` (REST genérica) y `github_graphql` (GraphQL), además de herramientas de alto nivel. **No es una cuenta GitHub ilimitada:** el servidor usa el PAT configurado, las políticas de ramas, el plan de GitHub y sus permisos. Todas las operaciones remotas se ejecutan desde el MCP conectado (no desde el chat sin conector).
 
 ## Operaciones implementadas
 
@@ -44,7 +44,7 @@ Para Fine-grained PAT, dar acceso solo a repositorios necesarios, con permisos s
 - **Issues/Pull requests/Administration** solo si quieres utilizar esas funciones.
 - Con tokens clásicos, repos privados suelen necesitar `repo`; para modificar YAML de workflows se requiere también `workflow`.
 
-Si no tienes permiso, GitHub devolverá 403 o 404; KagMCP no eleva privilegios. Algunas reglas de protección y políticas de organizaciones pueden impedir ciertas operaciones aunque el PAT tenga permiso.
+Si no tienes permiso, GitHub devolverá 403 o 404; Kaggle MCP no eleva privilegios. Algunas reglas de protección y políticas de organizaciones pueden impedir ciertas operaciones aunque el PAT tenga permiso.
 
 ## Límites conscientes
 

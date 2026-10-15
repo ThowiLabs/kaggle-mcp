@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	msg "github.com/ThowiLabs/kagssh-go/internal/frpmsg"
+	msg "github.com/ThowiLabs/kaggle-mcp/internal/frpmsg"
 	frpcrypto "github.com/fatedier/golib/crypto"
 	"github.com/hashicorp/yamux"
 )

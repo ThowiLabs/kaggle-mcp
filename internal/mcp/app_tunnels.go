@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ThowiLabs/kagssh-go/internal/gradiolive"
+	"github.com/ThowiLabs/kaggle-mcp/internal/gradiolive"
 )
 
 // Each named tunnel publishes an HTTP app already listening on 127.0.0.1.

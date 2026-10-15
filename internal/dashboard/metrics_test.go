@@ -23,7 +23,7 @@ func TestPanelAxolotlYMetricasAutorizadas(t *testing.T) {
 		t.Fatalf("métricas sin sesión: %d", got.Code)
 	}
 	login := call(h, "GET", "/login", nil)
-	if !strings.Contains(login.Body.String(), "Bienvenido a KagMCP") {
+	if !strings.Contains(login.Body.String(), "Bienvenido a Kaggle MCP") {
 		t.Fatal("no se presentó login")
 	}
 	cookie := login.Result().Cookies()[0]

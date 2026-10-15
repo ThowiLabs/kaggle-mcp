@@ -149,7 +149,7 @@
       put("runtimeState","Sin conexión");
       put("connectionStatus","Telemetría desconectada");
       put("lastUpdated","Fallo de lectura");
-      put("monitorNote","No hay una lectura reciente. Comprueba la conexión con KagMCP.");
+      put("monitorNote","No hay una lectura reciente. Comprueba la conexión con Kaggle MCP.");
       gauge("cpu",null);gauge("ram",null);
       ["diskTopValue","diskUsedText","diskUsed","diskFree","diskTotal","diskStatus",
         "ramUsed","ramFree","ramTotal","ramSource","cpuSource","cpuCapacity","cpuCores",

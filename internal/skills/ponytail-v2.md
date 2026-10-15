@@ -2285,7 +2285,7 @@ Antes de escribir cualquier línea de código:
 
 ---
 
-# 35. Regla de trabajo para proyectos probados en Kaggle (extensión KagMCP)
+# 35. Regla de trabajo para proyectos probados en Kaggle (extensión Kaggle MCP)
 
 La ejecución de un proyecto en Kaggle tiene un objetivo de entrega concreto, no solamente lanzar celdas de prueba:
 
@@ -2297,4 +2297,4 @@ La ejecución de un proyecto en Kaggle tiene un objetivo de entrega concreto, no
 6. **Solo después de verificar** el repositorio y el notebook funcionales, crear una interfaz **Gradio** del proyecto, conectada a las funciones reales (no una maqueta de producción); fijar la versión de Gradio y generar un lock reproducible de dependencias transitivas. Probar también el arranque de la UI.
 7. Exportar el contexto, la memoria y las tareas relevantes a los archivos versionables del repositorio y hacer commit/push cuando corresponda. No atribuir persistencia indefinida al almacenamiento efímero de Kaggle.
 
-Ponytail v2 permanece **activa durante todo el trabajo**, y esta extensión forma parte de sus reglas obligatorias dentro de KagMCP.
+Ponytail v2 permanece **activa durante todo el trabajo**, y esta extensión forma parte de sus reglas obligatorias dentro de Kaggle MCP.

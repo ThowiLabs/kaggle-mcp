@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ThowiLabs/kagssh-go/internal/securefs"
+	"github.com/ThowiLabs/kaggle-mcp/internal/securefs"
 )
 
 type Client struct {

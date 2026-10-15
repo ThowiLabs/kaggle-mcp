@@ -214,7 +214,7 @@ func (c *Client) UploadReleaseAsset(ctx context.Context, repo string, releaseID 
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	req.Header.Set("User-Agent", "KagMCP")
+	req.Header.Set("User-Agent", "Kaggle MCP")
 	contentType := mime.TypeByExtension(filepath.Ext(name))
 	if contentType == "" {
 		contentType = "application/octet-stream"

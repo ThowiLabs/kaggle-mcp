@@ -139,7 +139,7 @@ func TestProtectedResourceMetadataIncludesLilithIdentity(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
-	if payload["resource_name"] != "KagMCP" || payload["resource_name#en"] != "KagMCP" {
+	if payload["resource_name"] != "Kaggle MCP" || payload["resource_name#en"] != "Kaggle MCP" {
 		t.Fatalf("resource identity missing: %#v", payload)
 	}
 }

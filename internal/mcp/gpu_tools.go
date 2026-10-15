@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/ThowiLabs/kagssh-go/internal/gpumetrics"
+	"github.com/ThowiLabs/kaggle-mcp/internal/gpumetrics"
 )
 
 func gpuTool(name string) bool {

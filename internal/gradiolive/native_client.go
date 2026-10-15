@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	msg "github.com/ThowiLabs/kagssh-go/internal/frpmsg"
+	msg "github.com/ThowiLabs/kaggle-mcp/internal/frpmsg"
 	frpcrypto "github.com/fatedier/golib/crypto"
 	frpio "github.com/fatedier/golib/io"
 	"github.com/hashicorp/yamux"

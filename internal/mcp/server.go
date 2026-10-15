@@ -19,17 +19,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ThowiLabs/kagssh-go/internal/agenttasks"
-	"github.com/ThowiLabs/kagssh-go/internal/config"
-	"github.com/ThowiLabs/kagssh-go/internal/dashboard"
-	"github.com/ThowiLabs/kagssh-go/internal/diskguard"
-	"github.com/ThowiLabs/kagssh-go/internal/githubtoken"
-	"github.com/ThowiLabs/kagssh-go/internal/gpumetrics"
-	"github.com/ThowiLabs/kagssh-go/internal/oauth"
-	"github.com/ThowiLabs/kagssh-go/internal/pinauth"
-	"github.com/ThowiLabs/kagssh-go/internal/projectstate"
-	"github.com/ThowiLabs/kagssh-go/internal/securefs"
-	"github.com/ThowiLabs/kagssh-go/internal/skills"
+	"github.com/ThowiLabs/kaggle-mcp/internal/agenttasks"
+	"github.com/ThowiLabs/kaggle-mcp/internal/config"
+	"github.com/ThowiLabs/kaggle-mcp/internal/dashboard"
+	"github.com/ThowiLabs/kaggle-mcp/internal/diskguard"
+	"github.com/ThowiLabs/kaggle-mcp/internal/githubtoken"
+	"github.com/ThowiLabs/kaggle-mcp/internal/gpumetrics"
+	"github.com/ThowiLabs/kaggle-mcp/internal/oauth"
+	"github.com/ThowiLabs/kaggle-mcp/internal/pinauth"
+	"github.com/ThowiLabs/kaggle-mcp/internal/projectstate"
+	"github.com/ThowiLabs/kaggle-mcp/internal/securefs"
+	"github.com/ThowiLabs/kaggle-mcp/internal/skills"
 	"sync"
 )
 
@@ -90,7 +90,7 @@ func New(cfg config.Config, public string) (*Server, error) {
 	}
 	cfg.MCPAccessPIN = "" // La configuración retenida no necesita el PIN en claro.
 	if err := securefs.EnsurePrivateDir(cfg.DataDir); err != nil {
-		return nil, fmt.Errorf("proteger directorio KagMCP: %w", err)
+		return nil, fmt.Errorf("proteger directorio Kaggle MCP: %w", err)
 	}
 	state := filepath.Join(cfg.DataDir, "state", "oauth.json")
 	auth, err := oauth.New(oauth.Config{
@@ -145,7 +145,7 @@ func (s *Server) Handler() http.Handler {
 	}
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		_, _ = io.WriteString(w, "KagMCP OK\n")
+		_, _ = io.WriteString(w, "Kaggle MCP OK\n")
 	})
 	return mux
 }
@@ -210,7 +210,7 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		log.Warn("PIN temporal generado por Go; úsalo para el panel y OAuth, cambia el PIN desde el panel si deseas", "pin_temporal", server.generatedPIN)
 		server.generatedPIN = ""
 	}
-	log.Info("KagMCP listo para conectar cliente MCP", "url", public+"/mcp", "panel_web", public+"/", "tunnel", provider, "github_token_configurado", cfg.GitHubToken != "")
+	log.Info("Kaggle MCP listo para conectar cliente MCP", "url", public+"/mcp", "panel_web", public+"/", "tunnel", provider, "github_token_configurado", cfg.GitHubToken != "")
 	writeCurrentTunnelStatus(cfg, public, provider, "online", log)
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
@@ -413,7 +413,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"resultType":        "complete",
 			"supportedVersions": []string{modernProtocol, protocol},
 			"capabilities":      map[string]any{"tools": map[string]any{"listChanged": false}},
-			"_meta":             map[string]any{"io.modelcontextprotocol/serverInfo": map[string]string{"name": "kagmcp", "title": "KagMCP", "version": "0.2.0"}},
+			"_meta":             map[string]any{"io.modelcontextprotocol/serverInfo": map[string]string{"name": "kagmcp", "title": "Kaggle MCP", "version": "0.2.0"}},
 			"instructions":      mcpInstructions,
 			"ttlMs":             30000,
 			"cacheScope":        "private",
@@ -421,7 +421,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "initialize":
 		resp.Result = map[string]any{"protocolVersion": protocol,
 			"capabilities": map[string]any{"tools": map[string]any{"listChanged": false}},
-			"serverInfo":   map[string]string{"name": "kagmcp", "title": "KagMCP", "version": "0.2.0"},
+			"serverInfo":   map[string]string{"name": "kagmcp", "title": "Kaggle MCP", "version": "0.2.0"},
 			"instructions": mcpInstructions}
 	case "ping":
 		resp.Result = map[string]any{}
@@ -458,7 +458,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.rpc(w, resp)
 }
 
-const mcpInstructions = skills.Summary + " SUBAGENTES OPCIONALES: antes de usar agent_task_create pregunta SIEMPRE al usuario si desea delegar esta tarea concreta; si responde NO, trabaja aquí sin subagente. Solo si responde SÍ usa user_approved=true, conserva MCP destino explícito, ruta exacta y rama aislada. No creas ni abras chats automáticamente. Diferencia MCP coordinador KagMCP y MCP destino. Un subagente entrega needs_review/blocked; jamás se autoaprueba, hace merge ni push sin autorización. Ejecuta skills_read(ponytail-v2) al iniciar trabajo. PRIORIDAD GITHUB: para consultar o modificar contenido remoto en GitHub utiliza PRIMERO las herramientas github_* de este MCP (incluyendo github_tag_*, github_workflow_*, github_file_upload, github_release_asset_upload y github_api/graphql) cuando estén disponibles y autorizadas; pide consentimiento específico para crear tags, editar/ejecutar workflows, subir archivos, borrar recursos o fusionar PRs. No inventes estado de GitHub ni asumas permisos del PAT; evita exec/git manual para operaciones remotas ya cubiertas. No realices operaciones destructivas sin autorización explícita. Si GITHUB_TOKEN falta, solicita configurarlo en el panel, no inventes acceso. Para proyectos locales Kaggle usa herramientas locales autorizadas. En Kaggle cada prueba termina con repositorio Git y notebook funcional; después de verificarlos, una UI Gradio. Fija versiones, vigila espacio libre para evitar readonly, registra descripción/proyecto de comandos, memoria y tareas. Los datos de /kaggle/input solo lectura. No reveles secretos."
+const mcpInstructions = skills.Summary + " SUBAGENTES OPCIONALES: antes de usar agent_task_create pregunta SIEMPRE al usuario si desea delegar esta tarea concreta; si responde NO, trabaja aquí sin subagente. Solo si responde SÍ usa user_approved=true, conserva MCP destino explícito, ruta exacta y rama aislada. No creas ni abras chats automáticamente. Diferencia MCP coordinador Kaggle MCP y MCP destino. Un subagente entrega needs_review/blocked; jamás se autoaprueba, hace merge ni push sin autorización. Ejecuta skills_read(ponytail-v2) al iniciar trabajo. PRIORIDAD GITHUB: para consultar o modificar contenido remoto en GitHub utiliza PRIMERO las herramientas github_* de este MCP (incluyendo github_tag_*, github_workflow_*, github_file_upload, github_release_asset_upload y github_api/graphql) cuando estén disponibles y autorizadas; pide consentimiento específico para crear tags, editar/ejecutar workflows, subir archivos, borrar recursos o fusionar PRs. No inventes estado de GitHub ni asumas permisos del PAT; evita exec/git manual para operaciones remotas ya cubiertas. No realices operaciones destructivas sin autorización explícita. Si GITHUB_TOKEN falta, solicita configurarlo en el panel, no inventes acceso. Para proyectos locales Kaggle usa herramientas locales autorizadas. En Kaggle cada prueba termina con repositorio Git y notebook funcional; después de verificarlos, una UI Gradio. Fija versiones, vigila espacio libre para evitar readonly, registra descripción/proyecto de comandos, memoria y tareas. Los datos de /kaggle/input solo lectura. No reveles secretos."
 
 func (s *Server) rpc(w http.ResponseWriter, v response) {
 	s.rpcStatus(w, http.StatusOK, v)
@@ -518,7 +518,7 @@ func (s *Server) definitions() []any {
 		def("agent_task_create", "Crea asignación de subagente SOLO después de preguntar y obtener consentimiento explícito del usuario. Nunca delegar automáticamente. No inicia chats, no otorga permisos al MCP destino.", map[string]any{
 			"title": stringProp("Título"), "objective": stringProp("Trabajo específico"), "mcp": stringProp("Nombre literal del conector destino, ejemplo $pl0"), "mcp_id": stringProp("ID opcional de instancia"), "workspace": stringProp("Ruta absoluta de trabajo en el MCP destino"), "branch": stringProp("Rama/worktree aislado"), "allowed_paths": map[string]any{"type": "array", "items": map[string]any{"type": "string"}}, "criteria": stringProp("Criterios de aceptación"), "context": stringProp("Contexto necesario"), "user_approved": map[string]any{"type": "boolean", "description": "Verdadero SOLO si el usuario confirmó que desea delegar esta tarea en concreto"},
 		}, "title", "objective", "mcp", "workspace", "branch", "allowed_paths", "criteria", "context", "user_approved"),
-		def("agent_task_list", "Lista tareas de subagentes del coordinador KagMCP", map[string]any{}),
+		def("agent_task_list", "Lista tareas de subagentes del coordinador Kaggle MCP", map[string]any{}),
 		def("agent_task_status", "Consulta estado y entrega de una tarea", map[string]any{"id": stringProp("ID exacto")}, "id"),
 		def("agent_task_prompt", "Recupera prompt generado para copiarlo al chat secundario", map[string]any{"id": stringProp("ID exacto")}, "id"),
 		def("agent_task_review", "Orquestador: obtiene entrega y checklist para revisar commit/diff/pruebas. SOLO LECTURA; la aprobación requiere usuario en /agents.", map[string]any{"id": stringProp("ID exacto")}, "id"),

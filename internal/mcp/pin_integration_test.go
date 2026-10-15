@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ThowiLabs/kagssh-go/internal/config"
+	"github.com/ThowiLabs/kaggle-mcp/internal/config"
 )
 
 func TestBlankPINGeneratedByGo(t *testing.T) {

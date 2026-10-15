@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ThowiLabs/kagssh-go/internal/config"
-	"github.com/ThowiLabs/kagssh-go/internal/oauth"
+	"github.com/ThowiLabs/kaggle-mcp/internal/config"
+	"github.com/ThowiLabs/kaggle-mcp/internal/oauth"
 )
 
 const (
@@ -149,7 +149,7 @@ func recoverPublicTunnel(ctx context.Context, cfg config.Config, old *Server, br
 					}
 					bridge.Set(next.Handler())
 					if log != nil {
-						log.Warn("KagMCP restablecido con URL pública nueva; vuelve a conectar y autorizar ChatGPT", "url", url+"/mcp", "panel_web", url+"/", "provider", provider, "oauth_reauth_required", url != old.public)
+						log.Warn("Kaggle MCP restablecido con URL pública nueva; vuelve a conectar y autorizar ChatGPT", "url", url+"/mcp", "panel_web", url+"/", "provider", provider, "oauth_reauth_required", url != old.public)
 					}
 					return next, url, t, provider, nil
 				}

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#09070b"><title>KagMCP · Axolotl Dashboard</title>
+<meta name="theme-color" content="#09070b"><title>Kaggle MCP · Axolotl Dashboard</title>
 <link rel="icon" href="/assets/axolotl.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/assets/axolotl.css">
 <link rel="stylesheet" href="/assets/dashboard.css">
@@ -15,7 +15,7 @@
   <section class="login-card card" aria-labelledby="login-title">
     <img class="login-brand" src="/assets/axolotl.svg" alt="">
     <span class="eyebrow">CONTROL DE INSTANCIA</span>
-    <h1 id="login-title">Bienvenido a KagMCP</h1>
+    <h1 id="login-title">Bienvenido a Kaggle MCP</h1>
     <p>Acceso protegido al panel de tu instancia Kaggle.</p>
     {{if .Message}}<p class="alert" role="alert">{{.Message}}</p>{{end}}
     <form method="post" action="/login">
@@ -32,7 +32,7 @@
   <div class="mobile-sidebar-backdrop" id="mobileBackdrop" aria-hidden="true"></div>
   <aside class="sidebar" id="sidebar" aria-label="Navegación principal">
     <div class="sidebar-top">
-      <a class="brand" href="/" aria-label="KagMCP inicio"><img src="/assets/axolotl.svg" alt=""><span>Kag<span class="brand-accent">MCP</span><small>CONTROL CENTER</small></span></a>
+      <a class="brand" href="/" aria-label="Kaggle MCP inicio"><img src="/assets/axolotl.svg" alt=""><span>Kag<span class="brand-accent">MCP</span><small>CONTROL CENTER</small></span></a>
       <button type="button" id="collapseBtn" class="icon-button hide-mobile" aria-label="Contraer menú" aria-expanded="true" aria-controls="sidebar" title="Contraer menú">«</button>
     </div>
     <nav class="nav" aria-label="Navegación">
@@ -221,7 +221,7 @@
  {{end}}
 </section>
 <section class="card section-card agent-board" aria-labelledby="agentBoardHeading">
- <div class="card-head"><div><span class="card-kicker">SEGUIMIENTO</span><h3 id="agentBoardHeading">Tareas delegadas</h3></div><small>Guardadas en KagMCP</small></div>
+ <div class="card-head"><div><span class="card-kicker">SEGUIMIENTO</span><h3 id="agentBoardHeading">Tareas delegadas</h3></div><small>Guardadas en Kaggle MCP</small></div>
  {{range .AgentList}}
  <article class="agent-task">
   <div class="agent-task-top"><div><strong>{{.Title}}</strong><small>{{.ID}} · {{.MCP}} · {{.Workspace}}</small></div><span class="pill">{{.Status}}</span></div>
@@ -240,7 +240,7 @@
     <label>Motivo de cancelación<input name="note" maxlength="1000" placeholder="La tarea ya no se necesita" required></label>
     <button type="submit">Confirmar cancelación</button>
    </form>
-   <small>Cancelar en KagMCP impide nuevas entregas; no detiene automáticamente otro chat o comando en ejecución.</small>
+   <small>Cancelar en Kaggle MCP impide nuevas entregas; no detiene automáticamente otro chat o comando en ejecución.</small>
   </details>
   {{end}}{{end}}
   {{if eq .Status "needs_review"}}

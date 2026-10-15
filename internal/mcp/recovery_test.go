@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ThowiLabs/kagssh-go/internal/githubtoken"
+	"github.com/ThowiLabs/kaggle-mcp/internal/githubtoken"
 )
 
 type supervisedFakeTunnel struct {

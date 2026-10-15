@@ -1,19 +1,19 @@
-# Guía de uso de KagMCP
+# Guía de uso de Kaggle MCP
 
 ## 1. Propósito
 
-KagMCP conecta una sesión de Kaggle con clientes Model Context Protocol. Ofrece herramientas y un panel web para administración, proyectos, métricas, archivos e integraciones, con autenticación OAuth y PIN. Se ejecuta en Linux como binario Go único.
+Kaggle MCP conecta una sesión de Kaggle con clientes Model Context Protocol. Ofrece herramientas y un panel web para administración, proyectos, métricas, archivos e integraciones, con autenticación OAuth y PIN. Se ejecuta en Linux como binario Go único.
 
 ## 2. Notebook de arranque
 
-Abre `notebooks/kagssh_kaggle_chatgpt_agentes.ipynb` en Kaggle. Ejecuta en este orden:
+Abre `notebooks/kaggle_mcp.ipynb` en Kaggle. Ejecuta en este orden:
 
 1. **Clonar:** obtiene la rama `main` y verifica el remoto.
 2. **Instalar Go:** utiliza el runtime adecuado y valida la descarga cuando se necesita.
 3. **Compilar:** construye el binario Linux.
 4. **Configurar:** elige transporte HTTPS, puerto, PIN y credenciales opcionales.
 5. **Validar:** ejecuta `-check` sin abrir el servicio.
-6. **Iniciar:** ejecuta KagMCP y expone la URL de `/mcp`.
+6. **Iniciar:** ejecuta Kaggle MCP y expone la URL de `/mcp`.
 7. **Conectar:** añade el enlace a ChatGPT u otro cliente MCP y autoriza el acceso.
 
 El PIN temporal lo genera Go si `pin=""`; consulta su salida inicial de forma privada. Si especificas tu propio PIN, debe tener entre 6 y 128 caracteres. Las credenciales opcionales se piden mediante entrada oculta.

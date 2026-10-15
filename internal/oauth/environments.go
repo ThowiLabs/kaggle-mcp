@@ -29,10 +29,10 @@ const (
 )
 
 var (
-	ErrEnvironmentRequired = errors.New("MCP access required; request the current PIN from the KagMCP and reconnect")
-	ErrEnvironmentExpired  = errors.New("MCP access expired; request a new PIN from the KagMCP and reconnect")
-	ErrEnvironmentRevoked  = errors.New("MCP access revoked; request a new PIN from the KagMCP and reconnect")
-	ErrEnvironmentRotated  = errors.New("MCP credentials changed; request the current PIN from the KagMCP and reconnect")
+	ErrEnvironmentRequired = errors.New("MCP access required; request the current PIN from the Kaggle MCP and reconnect")
+	ErrEnvironmentExpired  = errors.New("MCP access expired; request a new PIN from the Kaggle MCP and reconnect")
+	ErrEnvironmentRevoked  = errors.New("MCP access revoked; request a new PIN from the Kaggle MCP and reconnect")
+	ErrEnvironmentRotated  = errors.New("MCP credentials changed; request the current PIN from the Kaggle MCP and reconnect")
 )
 
 type Environment struct {

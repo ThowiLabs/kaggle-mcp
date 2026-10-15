@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ThowiLabs/kagssh-go/internal/agenttasks"
+	"github.com/ThowiLabs/kaggle-mcp/internal/agenttasks"
 )
 
 func TestAgentOrchestratorPanelConsentAndReview(t *testing.T) {

@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ThowiLabs/kagssh-go/internal/gradiolive"
-	"github.com/ThowiLabs/kagssh-go/internal/quicktunnel"
+	"github.com/ThowiLabs/kaggle-mcp/internal/gradiolive"
+	"github.com/ThowiLabs/kaggle-mcp/internal/quicktunnel"
 )
 
 type publicTunnel interface {
@@ -33,7 +33,7 @@ func newProbeHandler() (*probeHandler, error) {
 	if _, err := rand.Read(b[:]); err != nil {
 		return nil, err
 	}
-	return &probeHandler{nonce: "KagMCP-" + base64.RawURLEncoding.EncodeToString(b[:])}, nil
+	return &probeHandler{nonce: "Kaggle MCP-" + base64.RawURLEncoding.EncodeToString(b[:])}, nil
 }
 func (p *probeHandler) Set(handler http.Handler) { p.mu.Lock(); p.actual = handler; p.mu.Unlock() }
 func (p *probeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +48,7 @@ func (p *probeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h := p.actual
 	p.mu.RUnlock()
 	if h == nil {
-		http.Error(w, "KagMCP inicializando", http.StatusServiceUnavailable)
+		http.Error(w, "Kaggle MCP inicializando", http.StatusServiceUnavailable)
 		return
 	}
 	h.ServeHTTP(w, r)
@@ -83,7 +83,7 @@ func healthCheckWithClient(ctx context.Context, public, nonce string, c *http.Cl
 		return err
 	}
 	if string(body) != nonce {
-		return errors.New("el enlace público no llega al KagMCP correcto")
+		return errors.New("el enlace público no llega al Kaggle MCP correcto")
 	}
 	return nil
 }

@@ -10,13 +10,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"github.com/ThowiLabs/kagssh-go/internal/agenttasks"
-	"github.com/ThowiLabs/kagssh-go/internal/diskguard"
-	"github.com/ThowiLabs/kagssh-go/internal/gpumetrics"
-	"github.com/ThowiLabs/kagssh-go/internal/pinauth"
-	"github.com/ThowiLabs/kagssh-go/internal/projectstate"
-	"github.com/ThowiLabs/kagssh-go/internal/runtimemetrics"
-	"github.com/ThowiLabs/kagssh-go/internal/skills"
+	"github.com/ThowiLabs/kaggle-mcp/internal/agenttasks"
+	"github.com/ThowiLabs/kaggle-mcp/internal/diskguard"
+	"github.com/ThowiLabs/kaggle-mcp/internal/gpumetrics"
+	"github.com/ThowiLabs/kaggle-mcp/internal/pinauth"
+	"github.com/ThowiLabs/kaggle-mcp/internal/projectstate"
+	"github.com/ThowiLabs/kaggle-mcp/internal/runtimemetrics"
+	"github.com/ThowiLabs/kaggle-mcp/internal/skills"
 	"html/template"
 	"log/slog"
 	"net"
@@ -156,7 +156,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := r.ParseForm(); err != nil {
 		slog.Warn("formulario de login inválido", "reason", "parse_or_size", "origin_present", r.Header.Get("Origin") != "")
-		h.loginPage(w, http.StatusBadRequest, "No se pudo leer el formulario. Abre de nuevo la URL pública de KagMCP y prueba otra vez.")
+		h.loginPage(w, http.StatusBadRequest, "No se pudo leer el formulario. Abre de nuevo la URL pública de Kaggle MCP y prueba otra vez.")
 		return
 	}
 	c, err := r.Cookie("__Host-kagmcp-login")

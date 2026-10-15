@@ -1,10 +1,10 @@
-# GitHub Actions: compilar, etiquetar y publicar KagMCP
+# GitHub Actions: compilar, etiquetar y publicar Kaggle MCP
 
-Workflow: `.github/workflows/release.yml` — aparece en **GitHub → Actions → Publicar KagMCP** una vez que este archivo se publique en la rama predeterminada.
+Workflow: `.github/workflows/release.yml` — aparece en **GitHub → Actions → Publicar Kaggle MCP** una vez que este archivo se publique en la rama predeterminada.
 
 ## Dos opciones de publicación
 
-**1. Manual (recomendada para versiones comerciales):** En GitHub abre *Actions → Publicar KagMCP → Run workflow*. Selecciona la rama predeterminada (por ejemplo, `main`) e deja **vacío** el campo de versión para generar automáticamente `1.0`, `1.1`, `1.2`… o introduce la versión que quieras, por ejemplo `1.0`, `2.5`, `v1.2.3` o `beta-1` (sin espacios y con nombre válido de tag Git). La ejecución valida pruebas, compila y empaqueta, **crea el tag ligero solamente después de compilar correctamente** y finalmente publica la Release con sus archivos. Si el tag ya existe y apunta al mismo commit, una ejecución fallida antes de publicar puede reanudarse indicando **manualmente esa versión**. Si dejas el campo vacío, calculará el siguiente número. Nunca sobrescribe tags ni releases existentes.
+**1. Manual (recomendada para versiones comerciales):** En GitHub abre *Actions → Publicar Kaggle MCP → Run workflow*. Selecciona la rama predeterminada (por ejemplo, `main`) e deja **vacío** el campo de versión para generar automáticamente `1.0`, `1.1`, `1.2`… o introduce la versión que quieras, por ejemplo `1.0`, `2.5`, `v1.2.3` o `beta-1` (sin espacios y con nombre válido de tag Git). La ejecución valida pruebas, compila y empaqueta, **crea el tag ligero solamente después de compilar correctamente** y finalmente publica la Release con sus archivos. Si el tag ya existe y apunta al mismo commit, una ejecución fallida antes de publicar puede reanudarse indicando **manualmente esa versión**. Si dejas el campo vacío, calculará el siguiente número. Nunca sobrescribe tags ni releases existentes.
 
 **2. Por tag:** Una vez publicado el workflow, un tag nuevo que empiece por un dígito (`1.0`) o por `v` (`v1.2.3`) y cuyo commit pertenezca al historial de la rama principal activará automáticamente la compilación y la Release.
 

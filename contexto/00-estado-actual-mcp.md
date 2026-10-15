@@ -2,10 +2,10 @@
 2026-10-13
 
 # Objetivo
-Mantener KagMCP como servidor Model Context Protocol para sesiones autorizadas de Kaggle.
+Mantener Kaggle MCP como servidor Model Context Protocol para sesiones autorizadas de Kaggle.
 
 # Decisiones tomadas
-- Nombre público: KagMCP; se conserva identificador del módulo Go y ruta del repositorio para compatibilidad.
+- Nombre público: Kaggle MCP; se conserva identificador del módulo Go y ruta del repositorio para compatibilidad.
 - Servidor MCP mediante HTTPS (Gradio, respaldo Cloudflare o proxy propio), OAuth y PIN.
 - Panel web para proyectos, memoria, tareas, actividad, métricas, Skills e integraciones.
 - Herramientas MCP autorizadas para las operaciones del runtime..
@@ -18,7 +18,7 @@ Mantener KagMCP como servidor Model Context Protocol para sesiones autorizadas d
 - internal/dashboard: interfaz administrativa.
 - internal/oauth: autorización OAuth.
 - internal/gradiolive e internal/quicktunnel: publicación HTTPS.
-- notebooks/kagssh_kaggle_chatgpt_agentes.ipynb: instalación, configuración y arranque.
+- notebooks/kaggle_mcp.ipynb: instalación, configuración y arranque.
 
 # Librerías usadas
 Dependencias Go administradas por go.mod.

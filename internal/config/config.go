@@ -108,7 +108,7 @@ func parse(v map[string]string) (Config, error) {
 
 func (c Config) Validate() error {
 	if !c.MCPEnabled {
-		return errors.New("MCP_ENABLED debe ser true para iniciar KagMCP")
+		return errors.New("MCP_ENABLED debe ser true para iniciar Kaggle MCP")
 	}
 	if c.MCPAccessPIN != "" && (len(c.MCPAccessPIN) < 6 || len(c.MCPAccessPIN) > 128 || strings.ContainsAny(c.MCPAccessPIN, "\r\n\x00")) {
 		return errors.New("MCP_ACCESS_PIN debe estar vacío (Go genera PIN) o tener entre 6 y 128 caracteres")

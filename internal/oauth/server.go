@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/ThowiLabs/kagssh-go/internal/pinauth"
+	"github.com/ThowiLabs/kaggle-mcp/internal/pinauth"
 	"html/template"
 	"log/slog"
 	"net/http"
@@ -258,8 +258,8 @@ func (s *Server) ValidateBearer(r *http.Request) error {
 func (s *Server) handleProtectedResourceMetadata(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"resource":                 s.resource,
-		"resource_name":            "KagMCP",
-		"resource_name#en":         "KagMCP",
+		"resource_name":            "Kaggle MCP",
+		"resource_name#en":         "Kaggle MCP",
 		"authorization_servers":    []string{s.publicURL},
 		"scopes_supported":         []string{rootScope},
 		"bearer_methods_supported": []string{"header"},

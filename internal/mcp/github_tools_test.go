@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ThowiLabs/kagssh-go/internal/githubtoken"
+	"github.com/ThowiLabs/kaggle-mcp/internal/githubtoken"
 )
 
 func TestGitHubFullMCPDefinitionsRegistered(t *testing.T) {
