@@ -57,6 +57,11 @@ func TestNativeFRPControlTLSAndEncryptedMessages(t *testing.T) {
 	defer listener.Close()
 	proxy := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	result := make(chan error, 1)
+	// Keep the fake FRP server alive until the client exits. Closing yamux
+	// immediately after NewProxyResp races with the client's read goroutine
+	// and sporadically returns "session shutdown" on loaded CI runners.
+	clientFinished := make(chan struct{})
+	responseWritten := make(chan struct{})
 	go func() {
 		fail := func(e error) { result <- e }
 		conn, err := listener.Accept()
@@ -124,6 +129,11 @@ func TestNativeFRPControlTLSAndEncryptedMessages(t *testing.T) {
 			fail(err)
 			return
 		}
+		// Signal that both the cipher IV and the message were fully written.
+		close(responseWritten)
+		// A real FRP server keeps the control connection open after
+		// advertising the public URL. Wait for the test client to stop.
+		<-clientFinished
 		fail(nil)
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
@@ -131,6 +141,7 @@ func TestNativeFRPControlTLSAndEncryptedMessages(t *testing.T) {
 	urlCh := make(chan string, 1)
 	resultClient := make(chan error, 1)
 	go func() {
+		defer close(clientFinished)
 		resultClient <- runNativeFRPSession(ctx, serverInfo{Host: "127.0.0.1", Port: listener.Addr().(*net.TCPAddr).Port, RootCA: ca}, 8181, proxy, func(url string) { urlCh <- url })
 	}()
 	select {
@@ -140,6 +151,13 @@ func TestNativeFRPControlTLSAndEncryptedMessages(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("no llegó respuesta FRP cifrada")
+	}
+	// Do not cancel the client while the simulated server is still
+	// writing its encrypted NewProxyResp (two separate yamux writes).
+	select {
+	case <-responseWritten:
+	case <-time.After(2 * time.Second):
+		t.Fatal("FRP simulado no completó la escritura cifrada")
 	}
 	cancel()
 	select {

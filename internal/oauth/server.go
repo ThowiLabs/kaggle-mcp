@@ -70,6 +70,7 @@ type Config struct {
 type Server struct {
 	publicURL                string
 	resource                 string
+	proxyOrigin              bool
 	store                    *Store
 	accessTTL                time.Duration
 	refreshTTL               time.Duration
@@ -118,10 +119,14 @@ func New(cfg Config) (*Server, error) {
 		} else if released {
 			slog.Warn("released stale OAuth owner left by an incomplete authorization")
 		}
-		if reset, err := store.ResetOwnerIfResourceChanged(resource, now); err != nil {
-			return nil, fmt.Errorf("reset OAuth owner for changed resource: %w", err)
-		} else if reset {
-			slog.Warn("reset OAuth owner because the public resource changed")
+		// A temporary tunnel can change while an OAuth client still uses
+		// the same custom proxy domain. Its resource and grant stay valid.
+		if !store.HasLiveProxyAuthorization(now) {
+			if reset, err := store.ResetOwnerIfResourceChanged(resource, now); err != nil {
+				return nil, fmt.Errorf("reset OAuth owner for changed resource: %w", err)
+			} else if reset {
+				slog.Warn("reset OAuth owner because the public resource changed")
+			}
 		}
 	}
 	pinState := cfg.PINState
@@ -149,6 +154,42 @@ func New(cfg Config) (*Server, error) {
 		agentMode:                cfg.AgentMode,
 	}, nil
 }
+
+// ForRequest keeps OAuth URLs and token audiences consistent with the HTTPS
+// domain used by a reverse proxy. Caddy forwards the original host using
+// X-Forwarded-Host, including when the actual upstream is a temporary Gradio
+// tunnel. No extra environment variables or global state are necessary.
+func (s *Server) ForRequest(r *http.Request) *Server {
+	if r == nil {
+		return s
+	}
+	host := strings.TrimSpace(r.Header.Get("X-Forwarded-Host"))
+	if host == "" && r.TLS != nil {
+		host = r.Host
+	}
+	if host == "" {
+		return s
+	}
+	// Only an authority is accepted; do not interpolate paths into OAuth URLs.
+	if strings.ContainsAny(host, " /?#@,") {
+		return s
+	}
+	u, err := url.Parse("https://" + host)
+	if err != nil || u.Host == "" || u.Hostname() == "" || u.User != nil {
+		return s
+	}
+	public := "https://" + u.Host
+	if public == s.publicURL {
+		return s
+	}
+	current := *s
+	current.publicURL = public
+	current.resource = public + "/mcp"
+	current.proxyOrigin = true
+	return &current
+}
+
+func (s *Server) PublicURL() string { return s.publicURL }
 
 func (s *Server) Resource() string { return s.resource }
 
@@ -179,14 +220,14 @@ func (s *Server) requiresPIN() bool {
 }
 
 func (s *Server) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /.well-known/oauth-protected-resource", s.handleProtectedResourceMetadata)
-	mux.HandleFunc("GET /.well-known/oauth-protected-resource/mcp", s.handleProtectedResourceMetadata)
-	mux.HandleFunc("GET /.well-known/oauth-authorization-server", s.handleAuthorizationServerMetadata)
-	mux.HandleFunc("GET /.well-known/oauth-authorization-server/mcp", s.handleAuthorizationServerMetadata)
-	mux.HandleFunc("POST /oauth/register", s.handleRegister)
-	mux.HandleFunc("GET /oauth/authorize", s.handleAuthorizeGET)
-	mux.HandleFunc("POST /oauth/authorize", s.handleAuthorizePOST)
-	mux.HandleFunc("POST /oauth/token", s.handleToken)
+	mux.HandleFunc("GET /.well-known/oauth-protected-resource", func(w http.ResponseWriter, r *http.Request) { s.ForRequest(r).handleProtectedResourceMetadata(w, r) })
+	mux.HandleFunc("GET /.well-known/oauth-protected-resource/mcp", func(w http.ResponseWriter, r *http.Request) { s.ForRequest(r).handleProtectedResourceMetadata(w, r) })
+	mux.HandleFunc("GET /.well-known/oauth-authorization-server", func(w http.ResponseWriter, r *http.Request) { s.ForRequest(r).handleAuthorizationServerMetadata(w, r) })
+	mux.HandleFunc("GET /.well-known/oauth-authorization-server/mcp", func(w http.ResponseWriter, r *http.Request) { s.ForRequest(r).handleAuthorizationServerMetadata(w, r) })
+	mux.HandleFunc("POST /oauth/register", func(w http.ResponseWriter, r *http.Request) { s.ForRequest(r).handleRegister(w, r) })
+	mux.HandleFunc("GET /oauth/authorize", func(w http.ResponseWriter, r *http.Request) { s.ForRequest(r).handleAuthorizeGET(w, r) })
+	mux.HandleFunc("POST /oauth/authorize", func(w http.ResponseWriter, r *http.Request) { s.ForRequest(r).handleAuthorizePOST(w, r) })
+	mux.HandleFunc("POST /oauth/token", func(w http.ResponseWriter, r *http.Request) { s.ForRequest(r).handleToken(w, r) })
 }
 
 func (s *Server) ResetOwner() error { return s.store.ResetOwner() }
@@ -855,7 +896,7 @@ func (s *Server) issueTokensLocked(clientID, resource, scope, environmentID stri
 		return "", "", err
 	}
 	now := time.Now().UTC()
-	grant := Token{ClientID: clientID, Resource: resource, Scope: scope, EnvironmentID: environmentID, EnvironmentRev: environmentRev, EnvironmentUntil: environmentUntil}
+	grant := Token{ClientID: clientID, Resource: resource, ProxyOrigin: s.proxyOrigin, Scope: scope, EnvironmentID: environmentID, EnvironmentRev: environmentRev, EnvironmentUntil: environmentUntil}
 	accessToken := grant
 	accessToken.ExpiresAt = now.Add(s.accessTTL)
 	refreshToken := grant

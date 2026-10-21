@@ -33,6 +33,8 @@ USE_GITHUB = False
 USE_HUGGINGFACE = False
 ```
 
+**Conexión mediante dominio fijo:** no hace falta definir `MCP_PUBLIC_URL` para usar `kg.mc365.eu.org` con el túnel Gradio o Cloudflare. Configura tu proxy inverso hacia la URL temporal del túnel y conecta el cliente MCP a `https://kg.mc365.eu.org/mcp`. El proxy debe conservar `X-Forwarded-Host` con el dominio original hasta Kaggle MCP; de esa forma los metadatos JSON y todo el flujo OAuth usan automáticamente el dominio consultado y no el subdominio temporal. Los tokens del dominio fijo sobreviven a la renovación del túnel, pero el upstream de Caddy debe actualizarse si el túnel cambia de dirección.
+
 El túnel `auto` prueba primero Gradio y, cuando no está disponible, usa Cloudflare. `none` requiere configurar un origen `MCP_PUBLIC_URL` con HTTPS válido y proxy administrado por ti. Ninguna modalidad exige GPU.
 
 ## 4. Herramientas MCP

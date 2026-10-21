@@ -311,7 +311,8 @@ func acceptedMCPOrigin(raw, public string) bool {
 	return u.Scheme == hostURL.Scheme && u.Host == hostURL.Host
 }
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if !acceptedMCPOrigin(r.Header.Get("Origin"), s.public) {
+	auth := s.auth.ForRequest(r)
+	if !acceptedMCPOrigin(r.Header.Get("Origin"), auth.PublicURL()) {
 		slog.Warn("MCP rechazado", "reason", "origin_not_allowed", "http_status", http.StatusForbidden)
 		http.Error(w, "Origin no permitido", http.StatusForbidden)
 		return
@@ -321,9 +322,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "este endpoint requiere POST", http.StatusMethodNotAllowed)
 		return
 	}
-	if err := s.auth.ValidateBearer(r); err != nil {
+	if err := auth.ValidateBearer(r); err != nil {
 		slog.Warn("MCP rechazado", "reason", "bearer_invalid", "http_status", http.StatusUnauthorized)
-		w.Header().Set("WWW-Authenticate", s.auth.WWWAuthenticate("invalid_token", "autorización requerida"))
+		w.Header().Set("WWW-Authenticate", auth.WWWAuthenticate("invalid_token", "autorización requerida"))
 		http.Error(w, "autenticación requerida", http.StatusUnauthorized)
 		return
 	}

@@ -51,6 +51,7 @@ type AuthorizationCode struct {
 type Token struct {
 	ClientID         string    `json:"client_id"`
 	Resource         string    `json:"resource"`
+	ProxyOrigin      bool      `json:"proxy_origin,omitempty"`
 	Scope            string    `json:"scope"`
 	EnvironmentID    string    `json:"environment_id,omitempty"`
 	EnvironmentRev   uint64    `json:"environment_revision,omitempty"`
@@ -188,6 +189,29 @@ func (s *Store) ResetOwner() error {
 	defer s.mu.Unlock()
 	s.resetOwnerLocked()
 	return s.saveLocked()
+}
+
+// HasLiveProxyAuthorization reports an OAuth grant issued for the original
+// HTTPS host of a reverse proxy. These grants must survive temporary tunnel
+// hostname changes; they remain bound to the exact resource URL.
+func (s *Store) HasLiveProxyAuthorization(now time.Time) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	owner := s.data.OwnerClientID
+	if owner == "" {
+		return false
+	}
+	for _, tok := range s.data.AccessTokens {
+		if tok.ProxyOrigin && tok.ClientID == owner && now.Before(tok.ExpiresAt) {
+			return true
+		}
+	}
+	for _, tok := range s.data.RefreshTokens {
+		if tok.ProxyOrigin && tok.ClientID == owner && now.Before(tok.ExpiresAt) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Store) ResetOwnerIfResourceChanged(resource string, now time.Time) (bool, error) {
