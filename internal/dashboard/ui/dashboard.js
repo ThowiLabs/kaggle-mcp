@@ -231,4 +231,33 @@
     put("liveLabel","PANEL ABIERTO");
     put("connectionStatus","Métricas disponibles en Recursos");
   }
+
+  // Ventanas modales de tarjetas (tarea 37): abrir con data-open-modal, cerrar
+  // con data-close-modal, clic en el fondo o tecla Escape; al cerrar, el foco
+  // vuelve al botón que abrió la ventana.
+  let lastFocus = null;
+  function openModal(id) {
+    const modal = el(id);
+    if (!modal) return;
+    lastFocus = document.activeElement;
+    modal.classList.add("open");
+    document.body.classList.add("modal-open");
+    const closeBtn = modal.querySelector("[data-close-modal]");
+    if (closeBtn) closeBtn.focus();
+  }
+  function closeModal(modal) {
+    if (!modal) return;
+    modal.classList.remove("open");
+    document.body.classList.remove("modal-open");
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  document.querySelectorAll("[data-open-modal]").forEach((btn) => btn.addEventListener("click", () => openModal(btn.getAttribute("data-open-modal"))));
+  document.querySelectorAll("[data-close-modal]").forEach((btn) => btn.addEventListener("click", () => closeModal(el(btn.getAttribute("data-close-modal")))));
+  document.querySelectorAll(".modal-lite").forEach((modal) => modal.addEventListener("click", (event) => { if (event.target === modal) closeModal(modal); }));
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    const open = document.querySelector(".modal-lite.open");
+    if (open) closeModal(open);
+  });
+
 })();

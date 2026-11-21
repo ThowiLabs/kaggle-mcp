@@ -161,51 +161,79 @@
  <p class="monitor-footnote" id="monitorNote">Muestreo sin datos simulados; los campos no disponibles mostrarán N/D.</p>
 </section>
 {{else if eq .Page "integrations"}}
-<div class="route-heading"><span class="eyebrow">CONEXIONES</span><h2>GitHub y Hugging Face</h2></div><section class="standalone-section">
-        <article class="card section-card"><div class="card-head"><div><span class="card-kicker">CREDENCIALES</span><h3>Integraciones</h3></div><span class="mini-icon">⌁</span></div>
-        <p>Los tokens se validan, se mantienen en el proceso y se exponen a las herramientas autorizadas como variables de entorno. No se guardan en disco.</p>
-        <div class="integration-item"><div><strong>GitHub</strong><small>{{if .GitHubOn}}Token configurado{{else}}Conecta tu cuenta para operar repositorios{{end}}</small></div><span class="pill">{{if .GitHubOn}}Activo{{else}}Inactivo{{end}}</span></div>
-        <form method="post" action="/github" class="inline-token"><input type="hidden" name="csrf" value="{{.CSRF}}"><label for="githubToken">GITHUB_TOKEN</label><input id="githubToken" name="token" type="password" autocomplete="off" maxlength="4096" placeholder="github_pat_…"><button type="submit">Guardar</button></form>
-        <div class="integration-item"><div><strong>Hugging Face</strong><small>{{if .HFOn}}Token configurado{{else}}Conecta tu cuenta para usar el Hub{{end}}</small></div><span class="pill">{{if .HFOn}}Activo{{else}}Inactivo{{end}}</span></div>
-        <form method="post" action="/huggingface" class="inline-token"><input type="hidden" name="csrf" value="{{.CSRF}}"><label for="hfToken">HF_TOKEN</label><input id="hfToken" name="token" type="password" autocomplete="off" maxlength="4096" placeholder="hf_…"><button type="submit">Guardar</button></form>
-        <small class="muted">Envía el campo vacío para eliminar el token del proceso actual. Los cambios son temporales.</small>
-        </article>
-        <article class="card section-card"><div class="card-head"><div><span class="card-kicker">TÚNEL INVERSO</span><h3>Túnel SSH inverso</h3></div><span class="mini-icon">⇄</span></div>
-        <p>Publica este MCP a través de tu propio servidor SSH, <strong>además</strong> de la URL temporal de Gradio/Cloudflare, que sigue funcionando como respaldo. No necesitas dominio ni variables nuevas.</p>
-        <p><strong>Estado:</strong> {{if .SSH.Configured}}{{if .SSH.Connected}}Activo · {{.SSH.Host}}:{{.SSH.AssignedPort}}{{else if .SSH.Enabled}}Conectando… · {{.SSH.Host}}{{else}}Deshabilitado · {{.SSH.Host}}{{end}}{{else}}Sin configurar{{end}}</p>
-        {{if .SSH.Configured}}<p>Usuario {{.SSH.User}} · Host {{.SSH.Host}} · Puerto SSH {{.SSH.SSHPort}} · Puerto remoto {{if .SSH.RemotePort}}{{.SSH.RemotePort}}{{else}}asignado por el servidor{{end}}{{if .SSH.AssignedPort}} (asignado: {{.SSH.AssignedPort}}){{end}}</p>{{end}}
-        {{if .SSH.LastError}}<p class="alert" role="alert">{{.SSH.LastError}}</p>{{end}}
-        {{if .SSHTestOK}}<p class="alert" role="status">Conexión SSH correcta; el servidor asignó el puerto remoto {{.SSHTestPort}}.</p>{{end}}
-        {{if .SSH.Configured}}{{if not .SSH.PINConfigured}}<p class="alert" role="alert">El PIN de este arranque fue generado: la configuración SSH no sobrevivirá al reinicio. Configura un PIN propio (MCP_ACCESS_PIN) y vuelve a introducir la contraseña.</p>{{end}}{{end}}
-        <form method="post" action="/ssh-tunnel" class="project-form"><input type="hidden" name="csrf" value="{{.CSRF}}">
-        <label>Usuario SSH<input name="user" maxlength="128" placeholder="usuario" value="{{.SSH.User}}" required></label>
-        <label>Host o IP<input name="host" maxlength="253" placeholder="servidor.example.com" value="{{.SSH.Host}}" required></label>
-        <label>Puerto SSH<input name="ssh_port" type="number" min="1" max="65535" value="{{if .SSH.SSHPort}}{{.SSH.SSHPort}}{{else}}22{{end}}" required></label>
-        <label>Puerto remoto (vacío = lo asigna el servidor)<input name="remote_port" type="number" min="0" max="65535" value="{{if .SSH.RemotePort}}{{.SSH.RemotePort}}{{end}}"></label>
-        <label>Contraseña SSH<input name="password" type="password" autocomplete="off" maxlength="1024" placeholder="Contraseña del servidor SSH" required></label>
-        <label>PIN actual (para cifrar la contraseña)<input name="pin" type="password" autocomplete="current-password" maxlength="128" placeholder="PIN del panel" required></label>
-        <label class="wide agent-check"><input type="checkbox" name="enabled" value="yes" {{if .SSH.Enabled}}checked{{end}}><span>Túnel habilitado (arranca solo al iniciar)</span></label>
-        <button type="submit" class="action-primary">Guardar configuración →</button>
-        <button type="submit" formaction="/ssh-tunnel-test">Probar conexión</button>
-        </form>
-        {{if .SSH.Configured}}
-        {{if .SSH.Enabled}}
-        <details class="agent-cancel"><summary>Detener túnel SSH</summary>
-        <form action="/ssh-tunnel-stop" method="post"><input type="hidden" name="csrf" value="{{.CSRF}}"><label class="wide agent-check"><input type="checkbox" name="confirm" value="yes" required><span>Confirmo que quiero detener el túnel SSH inverso. La URL temporal sigue funcionando.</span></label><button type="submit">Confirmar detención</button></form>
-        <small>Detener deshabilita el túnel; la configuración se conserva y se puede volver a iniciar. No se borra nada.</small>
-        </details>
-        {{else}}
-        <form action="/ssh-tunnel-start" method="post"><input type="hidden" name="csrf" value="{{.CSRF}}"><button type="submit" class="action-primary">Iniciar túnel SSH</button></form>
-        {{end}}
-        {{end}}
-        <small class="muted">La contraseña se cifra con tu PIN (PBKDF2 + AES-256-GCM) y nunca se muestra ni se registra. Si cambias el PIN, la configuración se invalida y tendrás que volver a introducir la contraseña. El túnel acepta conexiones de cualquier origen: es un MCP temporal y la URL no es autenticación; el PIN y OAuth siguen siendo obligatorios.</small>
-        </article>
-        </section>
+<div class="route-heading"><span class="eyebrow">CONEXIONES</span><h2>Integraciones</h2><p>Conecta tus cuentas y publica este MCP por tu propio servidor SSH. Cada integración se configura en su propia ventana.</p></div>
+<section class="standalone-section">
+<div class="integration-grid">
+<button type="button" class="integration-card" data-open-modal="modal-github" aria-haspopup="dialog"><span class="integration-icon" aria-hidden="true">⌁</span><strong>GitHub</strong><small>Conecta tu cuenta para operar repositorios</small><span class="pill">{{if .GitHubOn}}Activo{{else}}Inactivo{{end}}</span></button>
+<button type="button" class="integration-card" data-open-modal="modal-huggingface" aria-haspopup="dialog"><span class="integration-icon" aria-hidden="true">◇</span><strong>Hugging Face</strong><small>Conecta tu cuenta para usar el Hub</small><span class="pill">{{if .HFOn}}Activo{{else}}Inactivo{{end}}</span></button>
+<button type="button" class="integration-card" data-open-modal="modal-ssh" aria-haspopup="dialog"><span class="integration-icon" aria-hidden="true">⇄</span><strong>Túnel SSH inverso</strong><small>Publica este MCP por tu propio servidor SSH</small><span class="pill">{{if .SSH.Configured}}{{if .SSH.Connected}}Activo{{else if .SSH.Enabled}}Conectando…{{else}}Deshabilitado{{end}}{{else}}Sin configurar{{end}}</span></button>
+</div>
+<p class="muted">Los tokens se validan, se mantienen en el proceso y se exponen a las herramientas autorizadas como variables de entorno. No se guardan en disco.</p>
+</section>
+<div class="modal-lite" id="modal-github" role="dialog" aria-modal="true" aria-labelledby="modal-github-title">
+<div class="modal-card">
+<div class="modal-head"><div><span class="card-kicker">CREDENCIALES</span><h3 id="modal-github-title">GitHub</h3></div><button type="button" class="modal-close" data-close-modal="modal-github" aria-label="Cerrar">×</button></div>
+<p>Conecta tu cuenta para operar repositorios.</p>
+<div class="integration-item"><div><strong>GitHub</strong><small>{{if .GitHubOn}}Token configurado{{else}}Conecta tu cuenta para operar repositorios{{end}}</small></div><span class="pill">{{if .GitHubOn}}Activo{{else}}Inactivo{{end}}</span></div>
+<form method="post" action="/github" class="inline-token"><input type="hidden" name="csrf" value="{{.CSRF}}"><label for="githubToken">GITHUB_TOKEN</label><input id="githubToken" name="token" type="password" autocomplete="off" maxlength="4096" placeholder="github_pat_…"><button type="submit">Guardar</button></form>
+<small class="muted">Envía el campo vacío para eliminar el token del proceso actual. Los cambios son temporales.</small>
+</div>
+</div>
+<div class="modal-lite" id="modal-huggingface" role="dialog" aria-modal="true" aria-labelledby="modal-huggingface-title">
+<div class="modal-card">
+<div class="modal-head"><div><span class="card-kicker">CREDENCIALES</span><h3 id="modal-huggingface-title">Hugging Face</h3></div><button type="button" class="modal-close" data-close-modal="modal-huggingface" aria-label="Cerrar">×</button></div>
+<p>Conecta tu cuenta para usar el Hub.</p>
+<div class="integration-item"><div><strong>Hugging Face</strong><small>{{if .HFOn}}Token configurado{{else}}Conecta tu cuenta para usar el Hub{{end}}</small></div><span class="pill">{{if .HFOn}}Activo{{else}}Inactivo{{end}}</span></div>
+<form method="post" action="/huggingface" class="inline-token"><input type="hidden" name="csrf" value="{{.CSRF}}"><label for="hfToken">HF_TOKEN</label><input id="hfToken" name="token" type="password" autocomplete="off" maxlength="4096" placeholder="hf_…"><button type="submit">Guardar</button></form>
+<small class="muted">Envía el campo vacío para eliminar el token del proceso actual. Los cambios son temporales.</small>
+</div>
+</div>
+<div class="modal-lite" id="modal-ssh" role="dialog" aria-modal="true" aria-labelledby="modal-ssh-title">
+<div class="modal-card">
+<div class="modal-head"><div><span class="card-kicker">TÚNEL INVERSO</span><h3 id="modal-ssh-title">Túnel SSH inverso</h3></div><button type="button" class="modal-close" data-close-modal="modal-ssh" aria-label="Cerrar">×</button></div>
+<p>Publica este MCP a través de tu propio servidor SSH, <strong>además</strong> de la URL temporal de Gradio/Cloudflare, que sigue funcionando como respaldo. No necesitas dominio ni variables nuevas.</p>
+<p><strong>Estado:</strong> {{if .SSH.Configured}}{{if .SSH.Connected}}Activo · {{.SSH.Host}}:{{.SSH.AssignedPort}}{{else if .SSH.Enabled}}Conectando… · {{.SSH.Host}}{{else}}Deshabilitado · {{.SSH.Host}}{{end}}{{else}}Sin configurar{{end}}</p>
+{{if .SSH.Configured}}<p>Usuario {{.SSH.User}} · Host {{.SSH.Host}} · Puerto SSH {{.SSH.SSHPort}} · Puerto remoto {{if .SSH.RemotePort}}{{.SSH.RemotePort}}{{else}}asignado por el servidor{{end}}{{if .SSH.AssignedPort}} (asignado: {{.SSH.AssignedPort}}){{end}}</p>{{end}}
+{{if .SSH.LastError}}<p class="alert" role="alert">{{.SSH.LastError}}</p>{{end}}
+{{if .SSHTestOK}}<p class="alert" role="status">Conexión SSH correcta; el servidor asignó el puerto remoto {{.SSHTestPort}}.</p>{{end}}
+{{if .SSH.Configured}}{{if not .SSH.PINConfigured}}<p class="alert" role="alert">El PIN de este arranque fue generado: la configuración SSH no sobrevivirá al reinicio. Configura un PIN propio (MCP_ACCESS_PIN) y vuelve a introducir la contraseña.</p>{{end}}{{end}}
+<form method="post" action="/ssh-tunnel" class="project-form"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<label>Usuario SSH<input name="user" maxlength="128" placeholder="usuario" value="{{.SSH.User}}" required></label>
+<label>Host o IP<input name="host" maxlength="253" placeholder="servidor.example.com" value="{{.SSH.Host}}" required></label>
+<label>Puerto SSH<input name="ssh_port" type="number" min="1" max="65535" value="{{if .SSH.SSHPort}}{{.SSH.SSHPort}}{{else}}22{{end}}" required></label>
+<label>Puerto remoto (vacío = lo asigna el servidor)<input name="remote_port" type="number" min="0" max="65535" value="{{if .SSH.RemotePort}}{{.SSH.RemotePort}}{{end}}"></label>
+<label>Contraseña SSH<input name="password" type="password" autocomplete="off" maxlength="1024" placeholder="Contraseña del servidor SSH" required></label>
+<label>PIN actual (para cifrar la contraseña)<input name="pin" type="password" autocomplete="current-password" maxlength="128" placeholder="PIN del panel" required></label>
+<label class="wide agent-check"><input type="checkbox" name="enabled" value="yes" {{if .SSH.Enabled}}checked{{end}}><span>Túnel habilitado (arranca solo al iniciar)</span></label>
+<button type="submit" class="action-primary">Guardar configuración →</button>
+<button type="submit" formaction="/ssh-tunnel-test">Probar conexión</button>
+</form>
+{{if .SSH.Configured}}
+{{if .SSH.Enabled}}
+<details class="agent-cancel"><summary>Detener túnel SSH</summary>
+<form action="/ssh-tunnel-stop" method="post"><input type="hidden" name="csrf" value="{{.CSRF}}"><label class="wide agent-check"><input type="checkbox" name="confirm" value="yes" required><span>Confirmo que quiero detener el túnel SSH inverso. La URL temporal sigue funcionando.</span></label><button type="submit">Confirmar detención</button></form>
+<small>Detener deshabilita el túnel; la configuración se conserva y se puede volver a iniciar. No se borra nada.</small>
+</details>
+{{else}}
+<form action="/ssh-tunnel-start" method="post"><input type="hidden" name="csrf" value="{{.CSRF}}"><button type="submit" class="action-primary">Iniciar túnel SSH</button></form>
+{{end}}
+{{end}}
+<small class="muted">La contraseña se cifra con tu PIN (PBKDF2 + AES-256-GCM) y nunca se muestra ni se registra. Si cambias el PIN, la configuración se invalida y tendrás que volver a introducir la contraseña. El túnel acepta conexiones de cualquier origen: es un MCP temporal y la URL no es autenticación; el PIN y OAuth siguen siendo obligatorios.</small>
+</div>
+</div>
 {{else if eq .Page "projects"}}
 <div class="route-heading"><span class="eyebrow">ESPACIO DE TRABAJO</span><h2>Proyectos y tareas</h2></div><section class="standalone-section"><article class="card section-card" id="projects"><div class="card-head"><div><span class="card-kicker">ORGANIZACIÓN</span><h3>Nuevo proyecto</h3></div><span class="mini-icon">▤</span></div>
-        <p>Centraliza los repositorios, cuadernos y decisiones del equipo.</p>
-        <form method="post" action="/project" class="project-form"><input type="hidden" name="csrf" value="{{.CSRF}}"><label>ID del proyecto<input name="id" pattern="[a-zA-Z0-9_-]+" maxlength="80" placeholder="mi-proyecto" required></label><label>Nombre<input name="name" maxlength="200" placeholder="Mi proyecto Kaggle" required></label><label>Repositorio GitHub<input name="repository" placeholder="usuario/repositorio"></label><label>Notebook<input name="notebook" placeholder="notebooks/proyecto.ipynb"></label><button type="submit" class="action-primary">Crear proyecto →</button></form>
-        </article>
+<p>Centraliza los repositorios, cuadernos y decisiones del equipo.</p>
+<button type="button" class="action-primary" data-open-modal="modal-project">Crear proyecto →</button>
+</article>
+<div class="modal-lite" id="modal-project" role="dialog" aria-modal="true" aria-labelledby="modal-project-title">
+<div class="modal-card">
+<div class="modal-head"><div><span class="card-kicker">ORGANIZACIÓN</span><h3 id="modal-project-title">Nuevo proyecto</h3></div><button type="button" class="modal-close" data-close-modal="modal-project" aria-label="Cerrar">×</button></div>
+<p>Centraliza los repositorios, cuadernos y decisiones del equipo.</p>
+<form method="post" action="/project" class="project-form"><input type="hidden" name="csrf" value="{{.CSRF}}"><label>ID del proyecto<input name="id" pattern="[a-zA-Z0-9_-]+" maxlength="80" placeholder="mi-proyecto" required></label><label>Nombre<input name="name" maxlength="200" placeholder="Mi proyecto Kaggle" required></label><label>Repositorio GitHub<input name="repository" placeholder="usuario/repositorio"></label><label>Notebook<input name="notebook" placeholder="notebooks/proyecto.ipynb"></label><button type="submit" class="action-primary">Crear proyecto →</button></form>
+</div>
+</div>
+
       </section>
 <section class="projects-section" aria-label="Proyectos guardados">
       {{range .Projects}}{{$project := .ID}}
@@ -323,10 +351,21 @@
         </article>
         </section>
 {{else if eq .Page "security"}}
-<div class="route-heading"><span class="eyebrow">ACCESO</span><h2>Seguridad y sesión</h2></div><section class="standalone-section"><article class="card section-card" id="security"><div class="card-head"><div><span class="card-kicker">CUENTA</span><h3>Seguridad del panel</h3></div></div><p>El PIN protege el acceso y las conexiones autorizadas. La sesión se conserva hasta 7 días en el mismo dominio HTTPS, incluso tras reiniciar el proceso. Cambiar el PIN revoca las sesiones y autorizaciones OAuth. Si el túnel cambia de dominio, tendrás que iniciar sesión otra vez. Si cambias el PIN, la configuración del túnel SSH inverso dejará de descifrarse y tendrás que volver a introducir su contraseña desde Integraciones.</p>
-          <form method="post" action="/change-pin" class="security-form"><input type="hidden" name="csrf" value="{{.CSRF}}"><label>PIN actual<input type="password" name="current_pin" autocomplete="current-password" maxlength="128" required></label><label>Nuevo PIN<input type="password" name="new_pin" autocomplete="new-password" minlength="6" maxlength="128" required></label><button type="submit" class="action-primary">Actualizar PIN y cerrar sesiones</button></form>
-        </article>
-      </section>
+<div class="route-heading"><span class="eyebrow">ACCESO</span><h2>Seguridad y sesión</h2><p>Gestiona el PIN que protege el panel y la sesión de administración.</p></div>
+<section class="standalone-section">
+<div class="integration-grid">
+<article class="card integration-card-static"><span class="integration-icon" aria-hidden="true">♙</span><strong>Cambiar PIN</strong><small>Actualizar el PIN revoca las sesiones y las autorizaciones OAuth.</small><button type="button" class="action-primary" data-open-modal="modal-security">Cambiar PIN →</button></article>
+<article class="card integration-card-static"><span class="integration-icon" aria-hidden="true">◷</span><strong>Sesión activa</strong><small>La sesión se conserva hasta 7 días en el mismo dominio HTTPS, incluso tras reiniciar el proceso. Si el túnel cambia de dominio, tendrás que iniciar sesión otra vez.</small></article>
+</div>
+<p class="muted">Si cambias el PIN, la configuración del túnel SSH inverso dejará de descifrarse y tendrás que volver a introducir su contraseña desde Integraciones.</p>
+</section>
+<div class="modal-lite" id="modal-security" role="dialog" aria-modal="true" aria-labelledby="modal-security-title">
+<div class="modal-card">
+<div class="modal-head"><div><span class="card-kicker">CUENTA</span><h3 id="modal-security-title">Cambiar PIN</h3></div><button type="button" class="modal-close" data-close-modal="modal-security" aria-label="Cerrar">×</button></div>
+<p>El PIN protege el acceso y las conexiones autorizadas. Cambiar el PIN revoca las sesiones y autorizaciones OAuth.</p>
+<form method="post" action="/change-pin" class="security-form"><input type="hidden" name="csrf" value="{{.CSRF}}"><label>PIN actual<input type="password" name="current_pin" autocomplete="current-password" maxlength="128" required></label><label>Nuevo PIN<input type="password" name="new_pin" autocomplete="new-password" minlength="6" maxlength="128" required></label><button type="submit" class="action-primary">Actualizar PIN y cerrar sesiones</button></form>
+</div>
+</div>
 {{end}}
 <footer>Datos del runtime: /kaggle/working/.kagmcp · Guarda tu contexto en Git antes de finalizar la sesión.</footer>
     </div>

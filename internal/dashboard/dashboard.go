@@ -318,7 +318,7 @@ var pageDescriptions = map[string][2]string{
 	"/projects":     {"Proyectos", "Administra proyectos, tareas y memoria compartida"},
 	"/agents":       {"Agentes", "Delegación opcional entre chats y revisión de entregas"},
 	"/activity":     {"Actividad", "Registro de comandos ejecutados por los agentes"},
-	"/integrations": {"Integraciones", "Tokens de GitHub y Hugging Face"},
+	"/integrations": {"Integraciones", "GitHub, Hugging Face y túnel SSH"},
 	"/skills":       {"Skills", "Habilidades y documentación de los agentes"},
 	"/security":     {"Seguridad", "Gestiona tu PIN y la sesión de administración"},
 }
