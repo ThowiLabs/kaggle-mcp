@@ -23,6 +23,16 @@ No requiere `MCP_PUBLIC_URL`, banderas adicionales, middleware externo, cambios 
 
 La herramienta MCP `exec` puede ejecutar operaciones autorizadas en el runtime. Los clientes MCP autorizados actúan con permisos del proceso de Kaggle: concede acceso solo a clientes de confianza.
 
+## Túnel SSH inverso (opcional)
+
+Además de la URL temporal, Kaggle MCP puede publicarse a través de un servidor SSH propio con un túnel inverso (`-R puerto-remoto:127.0.0.1:<puerto MCP>`). Es aditivo: la URL temporal de Gradio/Cloudflare se sigue generando como respaldo y el túnel SSH solo arranca si está configurado desde el panel (Integraciones). No requiere dominio ni variables nuevas.
+
+- En el panel se introducen usuario, host o IP, puerto SSH (22 por defecto), puerto remoto (vacío: lo asigna el servidor y se muestra en el estado) y contraseña.
+- La contraseña se guarda cifrada en `<DataDir>/ssh-tunnel.json` con una clave derivada del PIN (PBKDF2-HMAC-SHA256 + AES-256-GCM). Solo persiste si usas un PIN propio (`MCP_ACCESS_PIN`): con el PIN temporal generado al arrancar, la configuración no sobrevivirá al reinicio. Si cambias el PIN, tendrás que volver a introducir la contraseña.
+- La clave del host SSH se fija en la primera conexión y se exige después; no se acepta cualquier clave.
+- Si el túnel falla o se cae, el servidor sigue funcionando con la URL temporal y reintenta en segundo plano.
+- El túnel acepta conexiones de cualquier origen: es un MCP temporal, no un servidor 24/7. La URL no es autenticación: el PIN y OAuth siguen siendo obligatorios.
+
 ## Uso rápido en Kaggle
 
 1. Abre [el notebook del proyecto](notebooks/kaggle_mcp.ipynb) en Kaggle y activa Internet.

@@ -17,6 +17,7 @@ import (
 	"github.com/ThowiLabs/kaggle-mcp/internal/projectstate"
 	"github.com/ThowiLabs/kaggle-mcp/internal/runtimemetrics"
 	"github.com/ThowiLabs/kaggle-mcp/internal/skills"
+	"github.com/ThowiLabs/kaggle-mcp/internal/sshtunnel"
 	"html/template"
 	"log/slog"
 	"net"
@@ -48,6 +49,11 @@ type Handler struct {
 	HFConfigured     func() bool
 	Export           func(string) (any, error)
 	Import           func(string) (any, error)
+	SSHStatus        func() sshtunnel.Status
+	SSHConfigure     func(pin, user, host string, sshPort, remotePort int, password string, enabled bool) (sshtunnel.Status, error)
+	SSHTest          func(context.Context, string, string, int, int, string) (int, error)
+	SSHStart         func() (sshtunnel.Status, error)
+	SSHStop          func() (sshtunnel.Status, error)
 	mu               sync.Mutex
 	sessions         map[string]session
 	failures         map[string]attempts
@@ -237,6 +243,75 @@ func (h *Handler) Verify(w http.ResponseWriter, r *http.Request) (session, bool)
 	return s, true
 }
 
+// sshTunnelAction atiende guardar, probar, iniciar y detener el túnel SSH
+// inverso desde Integraciones. Devuelve el destino de redirección.
+func (h *Handler) sshTunnelAction(r *http.Request) (string, error) {
+	switch r.URL.Path {
+	case "/ssh-tunnel":
+		if h.SSHConfigure == nil {
+			return "", errors.New("túnel SSH no disponible")
+		}
+		sshPort, remotePort, err := sshPorts(r)
+		if err != nil {
+			return "", err
+		}
+		if _, err := h.SSHConfigure(r.FormValue("pin"), r.FormValue("user"), r.FormValue("host"), sshPort, remotePort, r.FormValue("password"), r.FormValue("enabled") == "yes"); err != nil {
+			return "", err
+		}
+		return "/integrations", nil
+	case "/ssh-tunnel-test":
+		if h.SSHTest == nil {
+			return "", errors.New("túnel SSH no disponible")
+		}
+		sshPort, remotePort, err := sshPorts(r)
+		if err != nil {
+			return "", err
+		}
+		port, err := h.SSHTest(r.Context(), r.FormValue("user"), r.FormValue("host"), sshPort, remotePort, r.FormValue("password"))
+		if err != nil {
+			return "", err
+		}
+		return "/integrations?ssh_test=ok&port=" + strconv.Itoa(port), nil
+	case "/ssh-tunnel-start":
+		if h.SSHStart == nil {
+			return "", errors.New("túnel SSH no disponible")
+		}
+		if _, err := h.SSHStart(); err != nil {
+			return "", err
+		}
+		return "/integrations", nil
+	case "/ssh-tunnel-stop":
+		if r.FormValue("confirm") != "yes" {
+			return "", errors.New("confirma la detención del túnel SSH")
+		}
+		if h.SSHStop == nil {
+			return "", errors.New("túnel SSH no disponible")
+		}
+		if _, err := h.SSHStop(); err != nil {
+			return "", err
+		}
+		return "/integrations", nil
+	}
+	return "", errors.New("acción de túnel SSH desconocida")
+}
+
+// sshPorts lee los puertos del formulario SSH. El puerto remoto vacío
+// significa que el servidor SSH asigna uno.
+func sshPorts(r *http.Request) (int, int, error) {
+	sshPort, err := strconv.Atoi(r.FormValue("ssh_port"))
+	if err != nil || sshPort < 1 || sshPort > 65535 {
+		return 0, 0, errors.New("puerto SSH debe estar entre 1 y 65535")
+	}
+	remotePort := 0
+	if raw := r.FormValue("remote_port"); raw != "" {
+		remotePort, err = strconv.Atoi(raw)
+		if err != nil || remotePort < 0 || remotePort > 65535 {
+			return 0, 0, errors.New("puerto remoto debe ser 0 (asignado por el servidor) o estar entre 1 y 65535")
+		}
+	}
+	return sshPort, remotePort, nil
+}
+
 var pageDescriptions = map[string][2]string{
 	"/dashboard":    {"Dashboard", "Estado de CPU, memoria, GPU y disco de Kaggle"},
 	"/resources":    {"Recursos Kaggle", "Telemetría detallada del runtime, sin valores de demostración"},
@@ -274,6 +349,9 @@ type view struct {
 	PageTitle    string
 	PageSubtitle string
 	HFOn         bool
+	SSH          sshtunnel.Status
+	SSHTestOK    bool
+	SSHTestPort  int
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -286,7 +364,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.login(w, r)
 		return
 	}
-	if r.URL.Path != "/" && r.URL.Path != "/dashboard" && r.URL.Path != "/resources" && r.URL.Path != "/projects" && r.URL.Path != "/agents" && r.URL.Path != "/agent-create" && r.URL.Path != "/agent-review" && r.URL.Path != "/agent-cancel" && r.URL.Path != "/activity" && r.URL.Path != "/integrations" && r.URL.Path != "/security" && r.URL.Path != "/skills" && r.URL.Path != "/project" && r.URL.Path != "/memory" && r.URL.Path != "/task" && r.URL.Path != "/task-status" && r.URL.Path != "/github" && r.URL.Path != "/huggingface" && r.URL.Path != "/api/metrics" && r.URL.Path != "/api/activity" && r.URL.Path != "/export" && r.URL.Path != "/import" && r.URL.Path != "/change-pin" && r.URL.Path != "/logout" {
+	if r.URL.Path != "/" && r.URL.Path != "/dashboard" && r.URL.Path != "/resources" && r.URL.Path != "/projects" && r.URL.Path != "/agents" && r.URL.Path != "/agent-create" && r.URL.Path != "/agent-review" && r.URL.Path != "/agent-cancel" && r.URL.Path != "/activity" && r.URL.Path != "/integrations" && r.URL.Path != "/security" && r.URL.Path != "/skills" && r.URL.Path != "/project" && r.URL.Path != "/memory" && r.URL.Path != "/task" && r.URL.Path != "/task-status" && r.URL.Path != "/github" && r.URL.Path != "/huggingface" && r.URL.Path != "/api/metrics" && r.URL.Path != "/api/activity" && r.URL.Path != "/export" && r.URL.Path != "/import" && r.URL.Path != "/change-pin" && r.URL.Path != "/logout" && r.URL.Path != "/ssh-tunnel" && r.URL.Path != "/ssh-tunnel-test" && r.URL.Path != "/ssh-tunnel-start" && r.URL.Path != "/ssh-tunnel-stop" {
 		http.NotFound(w, r)
 		return
 	}
@@ -363,6 +441,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			v.SkillContent = body["content"].(string)
 			v.NextOffset = body["next_offset"].(int)
 		}
+		if pageName == "/integrations" {
+			if h.SSHStatus != nil {
+				v.SSH = h.SSHStatus()
+			}
+			if r.URL.Query().Get("ssh_test") == "ok" {
+				v.SSHTestOK = true
+				v.SSHTestPort, _ = strconv.Atoi(r.URL.Query().Get("port"))
+			}
+		}
 		h.page(w, v)
 		return
 	}
@@ -410,6 +497,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		cookie(w, "__Host-kagmcp-session", "", -1)
 		http.Redirect(w, r, "/login", 303)
+		return
+	}
+	if r.URL.Path == "/ssh-tunnel" || r.URL.Path == "/ssh-tunnel-test" || r.URL.Path == "/ssh-tunnel-start" || r.URL.Path == "/ssh-tunnel-stop" {
+		dest, err := h.sshTunnelAction(r)
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		http.Redirect(w, r, dest, http.StatusSeeOther)
 		return
 	}
 	var err error

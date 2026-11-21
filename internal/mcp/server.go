@@ -30,6 +30,7 @@ import (
 	"github.com/ThowiLabs/kaggle-mcp/internal/projectstate"
 	"github.com/ThowiLabs/kaggle-mcp/internal/securefs"
 	"github.com/ThowiLabs/kaggle-mcp/internal/skills"
+	"github.com/ThowiLabs/kaggle-mcp/internal/sshtunnel"
 	"sync"
 )
 
@@ -71,6 +72,7 @@ type Server struct {
 	skills       skills.Registry
 	appTunnels   *appTunnels
 	downloads    *fileDownloads
+	ssh          *sshtunnel.Manager
 }
 
 func New(cfg config.Config, public string) (*Server, error) {
@@ -133,6 +135,11 @@ func (s *Server) Handler() http.Handler {
 	panel := dashboard.New(s.public, s.pinState, s.auth.ResetOwner, s.projects, s.skills, s.configureGitHub, s.githubConfigured, s.projectExport, s.projectImport)
 	panel.HuggingFace = s.configureHF
 	panel.HFConfigured = s.hfConfigured
+	panel.SSHStatus = s.sshStatus
+	panel.SSHConfigure = s.configureSSH
+	panel.SSHTest = s.testSSH
+	panel.SSHStart = s.startSSH
+	panel.SSHStop = s.stopSSH
 	panel.Agents = s.agents
 	if err := panel.EnablePersistence(filepath.Join(s.cfg.DataDir, "state", "web-sessions.json")); err != nil {
 		slog.Error("no se pudo cargar las sesiones persistentes", "error", err)
@@ -200,6 +207,7 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	server.attachSSHTunnel(ctx, cfg.MCPAccessPIN, bridge.nonce, log)
 	server.appTunnels.ctx = ctx
 	defer server.appTunnels.closeAll()
 	if err := server.startCredentialBridge(ctx); err != nil {

@@ -116,7 +116,7 @@ func rebuildMCPForPublic(cfg config.Config, old *Server, public string) (*Server
 	old.hfMu.RUnlock()
 	next := &Server{
 		cfg: old.cfg, public: public, auth: auth, pinState: old.pinState,
-		github: github, githubOn: githubOn, githubSecret: githubSecret, hfToken: hfToken, appTunnels: old.appTunnels, downloads: old.downloads, projects: old.projects, agents: old.agents, skills: old.skills,
+		github: github, githubOn: githubOn, githubSecret: githubSecret, hfToken: hfToken, appTunnels: old.appTunnels, downloads: old.downloads, projects: old.projects, agents: old.agents, skills: old.skills, ssh: old.ssh,
 	}
 	return next, nil
 }
